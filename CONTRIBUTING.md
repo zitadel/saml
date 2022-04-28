@@ -8,20 +8,20 @@ Bugs are evaluated every day as soon as possible.
 
 ## Enhancement
 
-Do you miss a feature? Please file an issue [here](https://github.com/zitadel/oidc/issues/new?assignees=&labels=enhancement&template=feature_request.md&title=)
+Do you miss a feature? Please file an issue [here](https://github.com/zitadel/saml/issues/new?assignees=&labels=enhancement&template=feature_request.md&title=)
 
 Enhancements are discussed and evaluated every Wednesday by the ZITADEL core team.
 
 ## Grab an Issues
 
-We add the label "good first issue" for problems we think are a good starting point to contribute to the OIDC SDK.
+We add the label "good first issue" for problems we think are a good starting point to contribute to the SAML SDK.
 
-* [Issues for first time contributors](https://github.com/zitadel/oidc/issues?q=is%3Aissue+is%3Aopen+label%3A%22good+first+issue%22)
-* [All issues](https://github.com/zitadel/oidc/issues)
+* [Issues for first time contributors](https://github.com/zitadel/saml/issues?q=is%3Aissue+is%3Aopen+label%3A%22good+first+issue%22)
+* [All issues](https://github.com/zitadel/saml/issues)
 
 ### Make a PR
 
-If you like to contribute fork the OIDC repository. After you implemented the new feature create a PullRequest in the OIDC reposiotry.
+If you like to contribute fork the SAML repository. After you implemented the new feature create a PullRequest in the SAML repository.
 
 Make sure you use semantic release:
 
