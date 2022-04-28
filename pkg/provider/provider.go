@@ -104,6 +104,7 @@ func NewProvider(
 	metadata := op.NewEndpointWithURL(conf.MetadataConfig.Path, conf.MetadataConfig.URL)
 
 	idp, err := NewIdentityProvider(
+		ctx,
 		&metadata,
 		conf.IDPConfig,
 		storage,

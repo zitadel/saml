@@ -86,8 +86,8 @@ type IdentityProvider struct {
 	serviceProviders []*serviceprovider.ServiceProvider
 }
 
-func NewIdentityProvider(metadataEndpoint *op.Endpoint, conf *IdentityProviderConfig, storage IDPStorage) (*IdentityProvider, error) {
-	cert, privateKey := getResponseCert(storage)
+func NewIdentityProvider(ctx context.Context, metadataEndpoint *op.Endpoint, conf *IdentityProviderConfig, storage IDPStorage) (*IdentityProvider, error) {
+	cert, privateKey := getResponseCert(ctx, storage)
 
 	signingContext, signer, err := signature.GetSigningContextAndSigner(cert, privateKey, conf.SignatureAlgorithm)
 	if err != nil {
@@ -229,8 +229,7 @@ func notImplementedHandleFunc(w http.ResponseWriter, _ *http.Request) {
 	http.Error(w, fmt.Sprintf("not implemented yet"), http.StatusNotImplemented)
 }
 
-func getResponseCert(storage IdentityProviderStorage) ([]byte, *rsa.PrivateKey) {
-	ctx := context.Background()
+func getResponseCert(ctx context.Context, storage IdentityProviderStorage) ([]byte, *rsa.PrivateKey) {
 	certAndKeyCh := make(chan key.CertificateAndKey)
 	go storage.GetResponseSigningKey(ctx, certAndKeyCh)
 

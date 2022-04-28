@@ -1,6 +1,7 @@
 package provider
 
 import (
+	"context"
 	"github.com/golang/mock/gomock"
 	dsig "github.com/russellhaering/goxmldsig"
 	"github.com/zitadel/oidc/pkg/op"
@@ -513,7 +514,7 @@ func TestSSO_ssoHandleFunc(t *testing.T) {
 				return
 			}
 
-			idp, err := NewIdentityProvider(&endpoint, tt.args.config, mockStorage)
+			idp, err := NewIdentityProvider(context.Background(), &endpoint, tt.args.config, mockStorage)
 			if (err != nil) != tt.res.err {
 				t.Errorf("NewIdentityProvider() error = %v", err.Error())
 				return

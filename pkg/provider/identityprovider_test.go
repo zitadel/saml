@@ -95,7 +95,7 @@ func TestIDP_certificateHandleFunc(t *testing.T) {
 				return
 			}
 
-			idp, err := NewIdentityProvider(&endpoint, tt.args.config, mockStorage)
+			idp, err := NewIdentityProvider(context.Background(), &endpoint, tt.args.config, mockStorage)
 			if (err != nil) != tt.res.err {
 				t.Errorf("NewIdentityProvider() error = %v", err.Error())
 				return
