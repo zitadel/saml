@@ -1,0 +1,46 @@
+name: Release
+on:
+  push:
+    branches:
+      - main
+    tags-ignore:
+      - '**'
+  pull_request:
+    branches:
+      - '**'
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-18.04
+    strategy:
+      matrix:
+        go: ['1.17', '1.18']
+    name: Go ${{ matrix.go }} test
+    steps:
+      - uses: actions/checkout@v3
+      - name: Setup go
+        uses: actions/setup-go@v3
+        with:
+          go-version: ${{ matrix.go }}
+      - run: go test -race -v -coverprofile=profile.cov ./pkg/...
+      - uses: codecov/codecov-action@v3.1.0
+        with:
+          file: ./profile.cov
+          name: codecov-go
+  release:
+    runs-on: ubuntu-18.04
+    needs: [test]
+    if: ${{ github.event_name == 'workflow_dispatch' || github.ref == 'refs/heads/main' }}
+    env:
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    steps:
+    - name: Source checkout
+      uses: actions/checkout@v3
+    - name: Semantic Release
+      uses: cycjimmy/semantic-release-action@v2
+      with:
+        dry_run: false
+        semantic_version: 17.0.4
+        extra_plugins: |
+          @semantic-release/exec@5.0.0
