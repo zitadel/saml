@@ -80,12 +80,7 @@ func WriteXMLMarshalled(w http.ResponseWriter, body interface{}) error {
 }
 
 func Write(w http.ResponseWriter, body []byte) error {
-	_, err := w.Write([]byte(xml.Header))
-	if err != nil {
-		return err
-	}
-
-	_, err = w.Write(body)
+	_, err := w.Write(body)
 	return err
 }
 
@@ -173,6 +168,32 @@ func DecodeLogoutRequest(encoding string, message string) (*samlp.LogoutRequestT
 		reader := flate.NewReader(bytes.NewReader(reqBytes))
 		decoder := xml.NewDecoder(reader)
 		if err = decoder.Decode(req); err != nil {
+			return nil, err
+		}
+	default:
+		return nil, fmt.Errorf("unknown encoding")
+	}
+
+	return req, nil
+}
+
+func DecodeResponse(encoding string, message string) (*samlp.ResponseType, error) {
+	/*reqBytes, err := base64.StdEncoding.DecodeString(message)
+	if err != nil {
+		return nil, err
+	}*/
+
+	req := &samlp.ResponseType{}
+	switch encoding {
+	case "":
+		decoder := xml.NewDecoder(bytes.NewReader([]byte(message)))
+		if err := decoder.Decode(req); err != nil {
+			return nil, err
+		}
+	case EncodingDeflate:
+		reader := flate.NewReader(bytes.NewReader([]byte(message)))
+		decoder := xml.NewDecoder(reader)
+		if err := decoder.Decode(req); err != nil {
 			return nil, err
 		}
 	default:
