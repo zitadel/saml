@@ -84,9 +84,8 @@ type Provider struct {
 }
 
 type Config struct {
-	MetadataEndpoint *op.Endpoint
-	MetadataConfig   *MetadataConfig
-	IDPConfig        *IdentityProviderConfig
+	MetadataConfig *MetadataConfig
+	IDPConfig      *IdentityProviderConfig
 
 	Organisation  *Organisation
 	ContactPerson *ContactPerson
@@ -98,13 +97,14 @@ func NewProvider(
 	conf *Config,
 	providerOpts ...Option,
 ) (*Provider, error) {
+	getCACert(ctx, storage)
+	cert, key := getMetadataCert(ctx, storage)
+	signingContext, signer, err := signature.GetSigningContextAndSigner(cert, key, conf.MetadataConfig.SignatureAlgorithm)
 
-	getCACert(storage)
-	cert, key := getMetadataCert(storage)
-	signingContext, signer, err := signature.GetSigningContextAndSigner(cert, key, conf.IDPConfig.SignatureAlgorithm)
+	metadata := op.NewEndpointWithURL(conf.MetadataConfig.Path, conf.MetadataConfig.URL)
 
 	idp, err := NewIdentityProvider(
-		conf.MetadataEndpoint,
+		&metadata,
 		conf.IDPConfig,
 		storage,
 	)
@@ -113,7 +113,7 @@ func NewProvider(
 	}
 
 	prov := &Provider{
-		MetadataEndpoint: conf.MetadataEndpoint,
+		MetadataEndpoint: &metadata,
 		Metadata:         conf.getMetadata(idp),
 		signingContext:   signingContext,
 		signer:           signer,
@@ -157,8 +157,7 @@ func (p *Provider) Probes() []ProbesFn {
 		ReadyStorage(p.Storage()),
 	}
 }
-func getCACert(storage Storage) ([]byte, *rsa.PrivateKey) {
-	ctx := context.Background()
+func getCACert(ctx context.Context, storage Storage) ([]byte, *rsa.PrivateKey) {
 	certAndKeyCh := make(chan key.CertificateAndKey)
 	go storage.GetCA(ctx, certAndKeyCh)
 	for {
@@ -178,8 +177,7 @@ func getCACert(storage Storage) ([]byte, *rsa.PrivateKey) {
 	}
 }
 
-func getMetadataCert(storage Storage) ([]byte, *rsa.PrivateKey) {
-	ctx := context.Background()
+func getMetadataCert(ctx context.Context, storage Storage) ([]byte, *rsa.PrivateKey) {
 	certAndKeyCh := make(chan key.CertificateAndKey)
 	go storage.GetMetadataSigningKey(ctx, certAndKeyCh)
 
