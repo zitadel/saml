@@ -31,15 +31,15 @@ func (p *IdentityProvider) callbackHandleFunc(w http.ResponseWriter, r *http.Req
 	}
 
 	authRequest, err := p.storage.AuthRequestByID(r.Context(), requestID)
-	response.RequestID = authRequest.GetAuthRequestID()
-	response.RelayState = authRequest.GetRelayState()
-	response.ProtocolBinding = authRequest.GetBindingType()
-	response.AcsUrl = authRequest.GetAccessConsumerServiceURL()
 	if err != nil {
 		logging.Log("SAML-91jp3k").Error(err)
 		response.sendBackResponse(r, w, response.makeDeniedResponse(fmt.Errorf("failed to get request: %w", err).Error()))
 		return
 	}
+	response.RequestID = authRequest.GetAuthRequestID()
+	response.RelayState = authRequest.GetRelayState()
+	response.ProtocolBinding = authRequest.GetBindingType()
+	response.AcsUrl = authRequest.GetAccessConsumerServiceURL()
 
 	if !authRequest.Done() {
 		logging.Log("SAML-91jp2k").Error(err)
