@@ -68,15 +68,18 @@ func (mr *MockStorageMockRecorder) CreateAuthRequest(arg0, arg1, arg2, arg3, arg
 }
 
 // GetCA mocks base method
-func (m *MockStorage) GetCA(arg0 context.Context, arg1 chan<- key.CertificateAndKey) {
+func (m *MockStorage) GetCA(arg0 context.Context) (*key.CertificateAndKey, error) {
 	m.ctrl.T.Helper()
-	m.ctrl.Call(m, "GetCA", arg0, arg1)
+	ret := m.ctrl.Call(m, "GetCA", arg0)
+	ret0, _ := ret[0].(*key.CertificateAndKey)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
 }
 
 // GetCA indicates an expected call of GetCA
-func (mr *MockStorageMockRecorder) GetCA(arg0, arg1 interface{}) *gomock.Call {
+func (mr *MockStorageMockRecorder) GetCA(arg0 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetCA", reflect.TypeOf((*MockStorage)(nil).GetCA), arg0, arg1)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetCA", reflect.TypeOf((*MockStorage)(nil).GetCA), arg0)
 }
 
 // GetEntityByID mocks base method
@@ -110,27 +113,33 @@ func (mr *MockStorageMockRecorder) GetEntityIDByAppID(arg0, arg1 interface{}) *g
 }
 
 // GetMetadataSigningKey mocks base method
-func (m *MockStorage) GetMetadataSigningKey(arg0 context.Context, arg1 chan<- key.CertificateAndKey) {
+func (m *MockStorage) GetMetadataSigningKey(arg0 context.Context) (*key.CertificateAndKey, error) {
 	m.ctrl.T.Helper()
-	m.ctrl.Call(m, "GetMetadataSigningKey", arg0, arg1)
+	ret := m.ctrl.Call(m, "GetMetadataSigningKey", arg0)
+	ret0, _ := ret[0].(*key.CertificateAndKey)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
 }
 
 // GetMetadataSigningKey indicates an expected call of GetMetadataSigningKey
-func (mr *MockStorageMockRecorder) GetMetadataSigningKey(arg0, arg1 interface{}) *gomock.Call {
+func (mr *MockStorageMockRecorder) GetMetadataSigningKey(arg0 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetMetadataSigningKey", reflect.TypeOf((*MockStorage)(nil).GetMetadataSigningKey), arg0, arg1)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetMetadataSigningKey", reflect.TypeOf((*MockStorage)(nil).GetMetadataSigningKey), arg0)
 }
 
 // GetResponseSigningKey mocks base method
-func (m *MockStorage) GetResponseSigningKey(arg0 context.Context, arg1 chan<- key.CertificateAndKey) {
+func (m *MockStorage) GetResponseSigningKey(arg0 context.Context) (*key.CertificateAndKey, error) {
 	m.ctrl.T.Helper()
-	m.ctrl.Call(m, "GetResponseSigningKey", arg0, arg1)
+	ret := m.ctrl.Call(m, "GetResponseSigningKey", arg0)
+	ret0, _ := ret[0].(*key.CertificateAndKey)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
 }
 
 // GetResponseSigningKey indicates an expected call of GetResponseSigningKey
-func (mr *MockStorageMockRecorder) GetResponseSigningKey(arg0, arg1 interface{}) *gomock.Call {
+func (mr *MockStorageMockRecorder) GetResponseSigningKey(arg0 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetResponseSigningKey", reflect.TypeOf((*MockStorage)(nil).GetResponseSigningKey), arg0, arg1)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetResponseSigningKey", reflect.TypeOf((*MockStorage)(nil).GetResponseSigningKey), arg0)
 }
 
 // Health mocks base method

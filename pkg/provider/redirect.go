@@ -1,6 +1,7 @@
 package provider
 
 import (
+	"context"
 	"encoding/base64"
 	"fmt"
 	"github.com/zitadel/saml/pkg/provider/serviceprovider"
@@ -67,6 +68,7 @@ func verifyRedirectSignature(
 }
 
 func createRedirectSignature(
+	ctx context.Context,
 	samlResponse *samlp.ResponseType,
 	idp *IdentityProvider,
 	response *Response,
@@ -81,14 +83,28 @@ func createRedirectSignature(
 		return err
 	}
 
-	sigAlg := idp.signingContext.GetSignatureMethodIdentifier()
-	sig, err := signature.CreateRedirect(idp.signingContext, buildRedirectQuery(string(respData), response.RelayState, sigAlg, ""))
+	cert, key, err := getResponseCert(ctx, idp.storage)
+	if err != nil {
+		return err
+	}
+
+	tlsCert, err := signature.ParseTlsKeyPair(cert, key)
+	if err != nil {
+		return err
+	}
+
+	signingContext, err := signature.GetSigningContext(tlsCert, idp.conf.SignatureAlgorithm)
+	if err != nil {
+		return err
+	}
+
+	sig, err := signature.CreateRedirect(signingContext, buildRedirectQuery(string(respData), response.RelayState, idp.conf.SignatureAlgorithm, ""))
 	if err != nil {
 		return err
 	}
 
 	response.Signature = url.QueryEscape(base64.StdEncoding.EncodeToString(sig))
-	response.SigAlg = url.QueryEscape(base64.StdEncoding.EncodeToString([]byte(sigAlg)))
+	response.SigAlg = url.QueryEscape(base64.StdEncoding.EncodeToString([]byte(idp.conf.SignatureAlgorithm)))
 	return nil
 }
 

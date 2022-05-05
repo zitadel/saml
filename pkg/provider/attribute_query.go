@@ -23,6 +23,14 @@ func (p *IdentityProvider) attributeQueryHandleFunc(w http.ResponseWriter, r *ht
 	var attrQuery *samlp.AttributeQueryType
 	var response *samlp.ResponseType
 
+	metadata, _, err := p.GetMetadata(r.Context())
+	if err != nil {
+		err := fmt.Errorf("failed to read idp metadata: %w", err)
+		logging.Log("SAML-i1dsi3j").Error(err)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
 	//parse body to string
 	checkerInstance.WithLogicStep(
 		func() error {
@@ -103,7 +111,7 @@ func (p *IdentityProvider) attributeQueryHandleFunc(w http.ResponseWriter, r *ht
 
 	// verify that destination in request is this IDP
 	checkerInstance.WithLogicStep(
-		func() error { err = p.verifyRequestDestinationOfAttrQuery(attrQuery); return err },
+		func() error { err = verifyRequestDestinationOfAttrQuery(metadata, attrQuery); return err },
 		"SAML-ap2n1a",
 		func() {
 			http.Error(w, fmt.Errorf("failed to verify request destination: %w", err).Error(), http.StatusInternalServerError)
@@ -124,7 +132,7 @@ func (p *IdentityProvider) attributeQueryHandleFunc(w http.ResponseWriter, r *ht
 					queriedAttrs = append(queriedAttrs, queriedAttr)
 				}
 			}
-			response = makeAttributeQueryResponse(attrQuery.Id, p.EntityID, sp.GetEntityID(), attrs, queriedAttrs)
+			response = makeAttributeQueryResponse(attrQuery.Id, p.GetEntityID(r.Context()), sp.GetEntityID(), attrs, queriedAttrs)
 			return nil
 		},
 		"SAML-wosm22",
@@ -136,7 +144,7 @@ func (p *IdentityProvider) attributeQueryHandleFunc(w http.ResponseWriter, r *ht
 	// create enveloped signature
 	checkerInstance.WithLogicStep(
 		func() error {
-			return createPostSignature(response, p)
+			return createPostSignature(r.Context(), response, p)
 		},
 		"SAML-p012sa",
 		func() {

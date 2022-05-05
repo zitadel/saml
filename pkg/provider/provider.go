@@ -4,14 +4,10 @@ import (
 	"context"
 	"crypto/rsa"
 	"fmt"
-	"github.com/amdonov/xmlsig"
 	"github.com/google/uuid"
 	"github.com/gorilla/handlers"
 	"github.com/gorilla/mux"
-	dsig "github.com/russellhaering/goxmldsig"
-	"github.com/zitadel/logging"
-	"github.com/zitadel/oidc/pkg/op"
-	"github.com/zitadel/saml/pkg/provider/key"
+	"github.com/zitadel/oidc/v2/pkg/op"
 	"github.com/zitadel/saml/pkg/provider/signature"
 	"github.com/zitadel/saml/pkg/provider/xml/md"
 	"gopkg.in/square/go-jose.v2"
@@ -19,9 +15,11 @@ import (
 )
 
 const (
-	PostBinding     = "urn:oasis:names:tc:SAML:2.0:bindings:HTTP-POST"
-	RedirectBinding = "urn:oasis:names:tc:SAML:2.0:bindings:HTTP-Redirect"
-	SOAPBinding     = "urn:oasis:names:tc:SAML:2.0:bindings:SOAP"
+	PostBinding             = "urn:oasis:names:tc:SAML:2.0:bindings:HTTP-POST"
+	RedirectBinding         = "urn:oasis:names:tc:SAML:2.0:bindings:HTTP-Redirect"
+	SOAPBinding             = "urn:oasis:names:tc:SAML:2.0:bindings:SOAP"
+	HandlerPrefix           = "/saml"
+	DefaultMetadataEndpoint = "/metadata"
 )
 
 type Storage interface {
@@ -34,7 +32,6 @@ type Storage interface {
 
 type MetadataConfig struct {
 	Path               string
-	URL                string
 	SignatureAlgorithm string
 }
 
@@ -75,17 +72,17 @@ type Provider struct {
 	caCert       string
 	caKey        string
 
-	MetadataEndpoint *op.Endpoint
-	Metadata         *md.EntityDescriptorType
-	signingContext   *dsig.SigningContext
-	signer           xmlsig.Signer
-
-	IdentityProvider *IdentityProvider
+	metadataEndpoint  *op.Endpoint
+	conf              *Config
+	issuerFromRequest op.IssuerFromRequest
+	IdentityProvider  *IdentityProvider
 }
 
 type Config struct {
 	MetadataConfig *MetadataConfig
 	IDPConfig      *IdentityProviderConfig
+	Metadata       *op.Endpoint `yaml:"Metadata"`
+	Insecure       bool
 
 	Organisation  *Organisation
 	ContactPerson *ContactPerson
@@ -97,15 +94,25 @@ func NewProvider(
 	conf *Config,
 	providerOpts ...Option,
 ) (*Provider, error) {
-	getCACert(ctx, storage)
-	cert, key := getMetadataCert(ctx, storage)
-	signingContext, signer, err := signature.GetSigningContextAndSigner(cert, key, conf.MetadataConfig.SignatureAlgorithm)
+	_, _, err := getCACert(ctx, storage)
+	if err != nil {
+		return nil, err
+	}
 
-	metadata := op.NewEndpointWithURL(conf.MetadataConfig.Path, conf.MetadataConfig.URL)
+	metadataEndpoint := op.NewEndpoint(DefaultMetadataEndpoint)
+	if conf.Metadata != nil {
+		metadataEndpoint = *conf.Metadata
+	}
+
+	issuer := op.IssuerFromHost(HandlerPrefix)
+	issuerFromRequest, err := issuer(conf.Insecure)
+	if err != nil {
+		return nil, err
+	}
 
 	idp, err := NewIdentityProvider(
 		ctx,
-		&metadata,
+		metadataEndpoint,
 		conf.IDPConfig,
 		storage,
 	)
@@ -114,12 +121,11 @@ func NewProvider(
 	}
 
 	prov := &Provider{
-		MetadataEndpoint: &metadata,
-		Metadata:         conf.getMetadata(idp),
-		signingContext:   signingContext,
-		signer:           signer,
-		storage:          storage,
-		IdentityProvider: idp,
+		metadataEndpoint:  &metadataEndpoint,
+		storage:           storage,
+		conf:              conf,
+		issuerFromRequest: issuerFromRequest,
+		IdentityProvider:  idp,
 	}
 
 	for _, optFunc := range providerOpts {
@@ -158,64 +164,75 @@ func (p *Provider) Probes() []ProbesFn {
 		ReadyStorage(p.Storage()),
 	}
 }
-func getCACert(ctx context.Context, storage Storage) ([]byte, *rsa.PrivateKey) {
-	certAndKeyCh := make(chan key.CertificateAndKey)
-	go storage.GetCA(ctx, certAndKeyCh)
-	for {
-		select {
-		case <-ctx.Done():
-			//TODO
-		case certAndKey := <-certAndKeyCh:
-			if certAndKey.Key.Key == nil || certAndKey.Certificate.Key == nil {
-				logging.Log("OP-DAvt4").Warn("signer has no key")
-				continue
-			}
-			certWebKey := certAndKey.Certificate.Key.(jose.JSONWebKey)
-			keyWebKey := certAndKey.Key.Key.(jose.JSONWebKey)
 
-			return certWebKey.Key.([]byte), keyWebKey.Key.(*rsa.PrivateKey)
-		}
+func (p *Provider) GetMetadata(ctx context.Context) (*md.EntityDescriptorType, error) {
+	metadata, err := p.conf.getMetadata(ctx, p.IdentityProvider)
+	if err != nil {
+		return nil, err
 	}
+
+	cert, key, err := getMetadataCert(ctx, p.storage)
+	if p.conf.MetadataConfig != nil && p.conf.MetadataConfig.SignatureAlgorithm != "" {
+		signer, err := signature.GetSigner(cert, key, p.conf.MetadataConfig.SignatureAlgorithm)
+		if err != nil {
+			return nil, err
+		}
+
+		idpSig, err := signature.Create(signer, metadata)
+		if err != nil {
+			return nil, err
+		}
+		metadata.Signature = idpSig
+
+	}
+	return metadata, nil
 }
 
-func getMetadataCert(ctx context.Context, storage Storage) ([]byte, *rsa.PrivateKey) {
-	certAndKeyCh := make(chan key.CertificateAndKey)
-	go storage.GetMetadataSigningKey(ctx, certAndKeyCh)
-
-	for {
-		select {
-		case <-ctx.Done():
-			//TODO
-		case certAndKey := <-certAndKeyCh:
-			if certAndKey.Key.Key == nil || certAndKey.Certificate.Key == nil {
-				logging.Log("OP-DAvt4").Warn("signer has no key")
-				continue
-			}
-			certWebKey := certAndKey.Certificate.Key.(jose.JSONWebKey)
-			keyWebKey := certAndKey.Key.Key.(jose.JSONWebKey)
-
-			return certWebKey.Key.([]byte), keyWebKey.Key.(*rsa.PrivateKey)
-		}
+func getCACert(ctx context.Context, storage EntityStorage) ([]byte, *rsa.PrivateKey, error) {
+	certAndKey, err := storage.GetCA(ctx)
+	if err != nil {
+		return nil, nil, err
 	}
+
+	if certAndKey.Key.Key == nil || certAndKey.Certificate.Key == nil {
+		return nil, nil, fmt.Errorf("signer has no key")
+	}
+
+	certWebKey := certAndKey.Certificate.Key.(jose.JSONWebKey)
+	keyWebKey := certAndKey.Key.Key.(jose.JSONWebKey)
+
+	return certWebKey.Key.([]byte), keyWebKey.Key.(*rsa.PrivateKey), nil
+}
+
+func getMetadataCert(ctx context.Context, storage EntityStorage) ([]byte, *rsa.PrivateKey, error) {
+	certAndKey, err := storage.GetMetadataSigningKey(ctx)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	if certAndKey.Key.Key == nil || certAndKey.Certificate.Key == nil {
+		return nil, nil, fmt.Errorf("signer has no key")
+	}
+
+	certWebKey := certAndKey.Certificate.Key.(jose.JSONWebKey)
+	keyWebKey := certAndKey.Key.Key.(jose.JSONWebKey)
+
+	return certWebKey.Key.([]byte), keyWebKey.Key.(*rsa.PrivateKey), nil
 }
 
 type HttpInterceptor func(http.Handler) http.Handler
 
 func CreateRouter(p *Provider, interceptors ...HttpInterceptor) *mux.Router {
-	intercept := buildInterceptor(interceptors...)
 	router := mux.NewRouter()
-	router.Use(handlers.CORS(
-		handlers.AllowCredentials(),
-		handlers.AllowedHeaders([]string{"authorization", "content-type"}),
-		handlers.AllowedOriginValidator(allowAllOrigins),
-	))
+
+	router.Use(intercept(p.issuerFromRequest, interceptors...))
 	router.HandleFunc(healthEndpoint, healthHandler)
 	router.HandleFunc(readinessEndpoint, readyHandler(p.Probes()))
-	router.HandleFunc(p.MetadataEndpoint.Relative(), p.metadataHandle)
+	router.HandleFunc(p.metadataEndpoint.Relative(), p.metadataHandle)
 
 	if p.IdentityProvider != nil {
 		for _, route := range p.IdentityProvider.GetRoutes() {
-			router.Handle(route.Endpoint, intercept(route.HandleFunc))
+			router.Handle(route.Endpoint, route.HandleFunc)
 		}
 	}
 	return router
@@ -225,18 +242,24 @@ var allowAllOrigins = func(_ string) bool {
 	return true
 }
 
-func buildInterceptor(interceptors ...HttpInterceptor) func(http.HandlerFunc) http.Handler {
-	return func(handlerFunc http.HandlerFunc) http.Handler {
-		handler := handlerFuncToHandler(handlerFunc)
-		for i := len(interceptors) - 1; i >= 0; i-- {
-			handler = interceptors[i](handler)
-		}
-		return handler
+//AuthCallbackURL builds the url for the redirect (with the requestID) after a successful login
+func AuthCallbackURL(p *Provider) func(context.Context, string) string {
+	return func(ctx context.Context, requestID string) string {
+		return p.IdentityProvider.endpoints.CallbackEndpoint.Absolute(op.IssuerFromContext(ctx)) + "?id=" + requestID
 	}
 }
 
-func handlerFuncToHandler(handlerFunc http.HandlerFunc) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		handlerFunc(w, r)
-	})
+func intercept(i op.IssuerFromRequest, interceptors ...HttpInterceptor) func(handler http.Handler) http.Handler {
+	cors := handlers.CORS(
+		handlers.AllowCredentials(),
+		handlers.AllowedHeaders([]string{"authorization", "content-type"}),
+		handlers.AllowedOriginValidator(allowAllOrigins),
+	)
+	issuerInterceptor := op.NewIssuerInterceptor(i)
+	return func(handler http.Handler) http.Handler {
+		for i := len(interceptors) - 1; i >= 0; i-- {
+			handler = interceptors[i](handler)
+		}
+		return cors(issuerInterceptor.Handler(handler))
+	}
 }

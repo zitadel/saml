@@ -12,7 +12,7 @@ require (
 	github.com/russellhaering/goxmldsig v1.2.0
 	github.com/stretchr/testify v1.7.1
 	github.com/zitadel/logging v0.3.3
-	github.com/zitadel/oidc v1.3.1
+	github.com/zitadel/oidc/v2 v2.0.0-dynamic-issuer.2
 	gopkg.in/square/go-jose.v2 v2.6.0
 )
 

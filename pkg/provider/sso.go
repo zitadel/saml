@@ -36,7 +36,15 @@ func (p *IdentityProvider) ssoHandleFunc(w http.ResponseWriter, r *http.Request)
 		ErrorFunc: func(err error) {
 			http.Error(w, fmt.Errorf("failed to send response: %w", err).Error(), http.StatusInternalServerError)
 		},
-		Issuer: p.EntityID,
+		Issuer: p.GetEntityID(r.Context()),
+	}
+
+	metadata, _, err := p.GetMetadata(r.Context())
+	if err != nil {
+		err := fmt.Errorf("failed to read idp metadata: %w", err)
+		logging.Log("SAML-i1dsi2j").Error(err)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
 	}
 
 	// parse form to cover POST and REDIRECT binding
@@ -138,7 +146,7 @@ func (p *IdentityProvider) ssoHandleFunc(w http.ResponseWriter, r *http.Request)
 	// verify signature if necessary
 	checkerInstance.WithConditionalLogicStep(
 		signatureRedirectVerificationNecessary(
-			func() *md.IDPSSODescriptorType { return p.Metadata },
+			func() *md.IDPSSODescriptorType { return metadata },
 			func() *md.EntityDescriptorType { return sp.Metadata },
 			func() string { return authRequestForm.Sig },
 			func() string { return authRequestForm.Binding },
@@ -160,7 +168,7 @@ func (p *IdentityProvider) ssoHandleFunc(w http.ResponseWriter, r *http.Request)
 	// verify signature if necessary
 	checkerInstance.WithConditionalLogicStep(
 		signaturePostVerificationNecessary(
-			func() *md.IDPSSODescriptorType { return p.Metadata },
+			func() *md.IDPSSODescriptorType { return metadata },
 			func() *md.EntityDescriptorType { return sp.Metadata },
 			func() *xml_dsig.SignatureType { return authNRequest.Signature },
 			func() string { return authRequestForm.Binding },
@@ -205,7 +213,7 @@ func (p *IdentityProvider) ssoHandleFunc(w http.ResponseWriter, r *http.Request)
 
 	checkerInstance.WithLogicStep(
 		checkRequestRequiredContent(
-			func() *IdentityProvider { return p },
+			func() *md.IDPSSODescriptorType { return metadata },
 			func() *serviceprovider.ServiceProvider { return sp },
 			func() *samlp.AuthnRequestType { return authNRequest },
 		),
@@ -275,13 +283,13 @@ func getAuthRequestFromRequest(r *http.Request) (*AuthRequestForm, error) {
 }
 
 func checkRequestRequiredContent(
-	idpF func() *IdentityProvider,
+	idpMetadataF func() *md.IDPSSODescriptorType,
 	spF func() *serviceprovider.ServiceProvider,
 	authNRequestF func() *samlp.AuthnRequestType,
 ) func() error {
 	return func() error {
 		sp := spF()
-		idp := idpF()
+		idpMetadata := idpMetadataF()
 		authNRequest := authNRequestF()
 
 		if authNRequest.Conditions != nil &&
@@ -310,7 +318,7 @@ func checkRequestRequiredContent(
 			return fmt.Errorf("issuer in request not equal entityID of service provider")
 		}
 
-		if err := idp.verifyRequestDestinationOfAuthRequest(authNRequest); err != nil {
+		if err := verifyRequestDestinationOfAuthRequest(idpMetadata, authNRequest); err != nil {
 			return err
 		}
 

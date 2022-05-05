@@ -12,7 +12,7 @@ func (p *IdentityProvider) callbackHandleFunc(w http.ResponseWriter, r *http.Req
 		ErrorFunc: func(err error) {
 			http.Error(w, fmt.Errorf("failed to send response: %w", err).Error(), http.StatusInternalServerError)
 		},
-		Issuer: p.EntityID,
+		Issuer: p.GetEntityID(r.Context()),
 	}
 
 	ctx := r.Context()
@@ -67,13 +67,13 @@ func (p *IdentityProvider) callbackHandleFunc(w http.ResponseWriter, r *http.Req
 
 	switch response.ProtocolBinding {
 	case PostBinding:
-		if err := createPostSignature(samlResponse, p); err != nil {
+		if err := createPostSignature(r.Context(), samlResponse, p); err != nil {
 			logging.Log("SAML-120dk2").Error(err)
 			response.sendBackResponse(r, w, response.makeResponderFailResponse(fmt.Errorf("failed to sign response: %w", err).Error()))
 			return
 		}
 	case RedirectBinding:
-		if err := createRedirectSignature(samlResponse, p, response); err != nil {
+		if err := createRedirectSignature(r.Context(), samlResponse, p, response); err != nil {
 			logging.Log("SAML-jwnu2i").Error(err)
 			response.sendBackResponse(r, w, response.makeResponderFailResponse(fmt.Errorf("failed to sign response: %w", err).Error()))
 			return
