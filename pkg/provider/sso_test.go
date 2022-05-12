@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"github.com/golang/mock/gomock"
 	dsig "github.com/russellhaering/goxmldsig"
-	"github.com/zitadel/oidc/v2/pkg/op"
 	"github.com/zitadel/saml/pkg/provider/mock"
 	"github.com/zitadel/saml/pkg/provider/serviceprovider"
 	"github.com/zitadel/saml/pkg/provider/xml"
@@ -633,7 +632,7 @@ func TestSSO_ssoHandleFunc(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			endpoint := op.NewEndpoint(tt.args.metadataEndpoint)
+			endpoint := NewEndpoint(tt.args.metadataEndpoint)
 			spInst, err := serviceprovider.NewServiceProvider(tt.args.sp.entityID, &serviceprovider.ServiceProviderConfig{Metadata: tt.args.sp.metadata}, "")
 			if err != nil {
 				t.Errorf("error while creating service provider")
@@ -664,7 +663,7 @@ func TestSSO_ssoHandleFunc(t *testing.T) {
 				return
 			}
 
-			callURL := idp.endpoints.SingleSignOnEndpoint.Relative()
+			callURL := idp.endpoints.singleSignOnEndpoint.Relative()
 			form := url.Values{}
 			var req *http.Request
 			if tt.args.request.Binding == RedirectBinding {

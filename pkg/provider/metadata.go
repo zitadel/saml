@@ -6,12 +6,17 @@ import (
 	"encoding/xml"
 	"fmt"
 	"github.com/zitadel/logging"
-	"github.com/zitadel/oidc/v2/pkg/op"
 	saml_xml "github.com/zitadel/saml/pkg/provider/xml"
 	"github.com/zitadel/saml/pkg/provider/xml/md"
 	"github.com/zitadel/saml/pkg/provider/xml/xenc"
 	"github.com/zitadel/saml/pkg/provider/xml/xml_dsig"
 	"net/http"
+	"time"
+)
+
+const (
+	DefaultValidUntil    time.Duration = 5 * time.Minute
+	DefaultCacheDuration string        = "PT300S"
 )
 
 func (p *Provider) metadataHandle(w http.ResponseWriter, r *http.Request) {
@@ -72,22 +77,30 @@ func (p *IdentityProviderConfig) getMetadata(
 			attr.AttributeValue[i] = ""
 		}
 	}
+	validUntil := ""
+	if p.MetadataIDPConfig.ValidUntil != 0 {
+		validUntil = time.Now().Add(p.MetadataIDPConfig.ValidUntil).UTC().Format(defaultTimeLayout)
+	}
+	cacheDuration := ""
+	if p.MetadataIDPConfig.CacheDuration != "" {
+		cacheDuration = p.MetadataIDPConfig.CacheDuration
+	}
 
 	return &md.IDPSSODescriptorType{
 			XMLName:                    xml.Name{},
 			WantAuthnRequestsSigned:    p.WantAuthRequestsSigned,
 			Id:                         NewID(),
-			ValidUntil:                 p.MetadataIDPConfig.ValidUntil,
-			CacheDuration:              p.MetadataIDPConfig.CacheDuration,
+			ValidUntil:                 validUntil,
+			CacheDuration:              cacheDuration,
 			ProtocolSupportEnumeration: "urn:oasis:names:tc:SAML:2.0:protocol",
 			ErrorURL:                   p.MetadataIDPConfig.ErrorURL,
 			SingleSignOnService: []md.EndpointType{
 				{
 					Binding:  RedirectBinding,
-					Location: endpoints.SingleSignOnEndpoint.Absolute(op.IssuerFromContext(ctx)),
+					Location: endpoints.singleSignOnEndpoint.Absolute(IssuerFromContext(ctx)),
 				}, {
 					Binding:  PostBinding,
-					Location: endpoints.SingleSignOnEndpoint.Absolute(op.IssuerFromContext(ctx)),
+					Location: endpoints.singleSignOnEndpoint.Absolute(IssuerFromContext(ctx)),
 				},
 			},
 			//TODO definition for more profiles
@@ -108,11 +121,11 @@ func (p *IdentityProviderConfig) getMetadata(
 				},*/
 				{
 					Binding:  RedirectBinding,
-					Location: endpoints.SingleLogoutEndpoint.Absolute(op.IssuerFromContext(ctx)),
+					Location: endpoints.singleLogoutEndpoint.Absolute(IssuerFromContext(ctx)),
 				},
 				{
 					Binding:  PostBinding,
-					Location: endpoints.SingleLogoutEndpoint.Absolute(op.IssuerFromContext(ctx)),
+					Location: endpoints.singleLogoutEndpoint.Absolute(IssuerFromContext(ctx)),
 				},
 			},
 			NameIDFormat:  []string{"urn:oasis:names:tc:SAML:2.0:nameid-format:persistent"},
@@ -130,13 +143,13 @@ func (p *IdentityProviderConfig) getMetadata(
 		&md.AttributeAuthorityDescriptorType{
 			XMLName:                    xml.Name{},
 			Id:                         NewID(),
-			ValidUntil:                 p.MetadataIDPConfig.ValidUntil,
-			CacheDuration:              p.MetadataIDPConfig.CacheDuration,
+			ValidUntil:                 validUntil,
+			CacheDuration:              cacheDuration,
 			ProtocolSupportEnumeration: "urn:oasis:names:tc:SAML:2.0:protocol",
 			ErrorURL:                   p.MetadataIDPConfig.ErrorURL,
 			AttributeService: []md.EndpointType{{
 				Binding:  "urn:oasis:names:tc:SAML:2.0:bindings:SOAP",
-				Location: endpoints.AttributeEndpoint.Absolute(op.IssuerFromContext(ctx)),
+				Location: endpoints.attributeEndpoint.Absolute(IssuerFromContext(ctx)),
 			}},
 			NameIDFormat: []string{"urn:oasis:names:tc:SAML:2.0:nameid-format:persistent"},
 			//TODO definition for more profiles

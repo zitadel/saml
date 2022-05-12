@@ -7,7 +7,6 @@ import (
 	"github.com/google/uuid"
 	"github.com/gorilla/handlers"
 	"github.com/gorilla/mux"
-	"github.com/zitadel/oidc/v2/pkg/op"
 	"github.com/zitadel/saml/pkg/provider/signature"
 	"github.com/zitadel/saml/pkg/provider/xml/md"
 	"gopkg.in/square/go-jose.v2"
@@ -18,7 +17,6 @@ const (
 	PostBinding             = "urn:oasis:names:tc:SAML:2.0:bindings:HTTP-POST"
 	RedirectBinding         = "urn:oasis:names:tc:SAML:2.0:bindings:HTTP-Redirect"
 	SOAPBinding             = "urn:oasis:names:tc:SAML:2.0:bindings:SOAP"
-	HandlerPrefix           = "/saml"
 	DefaultMetadataEndpoint = "/metadata"
 )
 
@@ -28,6 +26,15 @@ type Storage interface {
 	IdentityProviderStorage
 	UserStorage
 	Health(context.Context) error
+}
+
+type Config struct {
+	MetadataConfig *MetadataConfig
+	IDPConfig      *IdentityProviderConfig
+	Metadata       *Endpoint `yaml:"Metadata"`
+
+	Organisation  *Organisation
+	ContactPerson *ContactPerson
 }
 
 type MetadataConfig struct {
@@ -56,10 +63,6 @@ type ContactPerson struct {
 	TelephoneNumber string
 }
 
-func NewID() string {
-	return fmt.Sprintf("_%s", uuid.New())
-}
-
 const (
 	healthEndpoint    = "/healthz"
 	readinessEndpoint = "/ready"
@@ -69,45 +72,24 @@ type Provider struct {
 	storage      Storage
 	httpHandler  http.Handler
 	interceptors []HttpInterceptor
-	caCert       string
-	caKey        string
+	insecure     bool
 
-	metadataEndpoint  *op.Endpoint
+	metadataEndpoint  *Endpoint
 	conf              *Config
-	issuerFromRequest op.IssuerFromRequest
-	IdentityProvider  *IdentityProvider
-}
-
-type Config struct {
-	MetadataConfig *MetadataConfig
-	IDPConfig      *IdentityProviderConfig
-	Metadata       *op.Endpoint `yaml:"Metadata"`
-	Insecure       bool
-
-	Organisation  *Organisation
-	ContactPerson *ContactPerson
+	issuerFromRequest IssuerFromRequest
+	identityProvider  *IdentityProvider
 }
 
 func NewProvider(
 	ctx context.Context,
 	storage Storage,
+	path string,
 	conf *Config,
 	providerOpts ...Option,
 ) (*Provider, error) {
-	_, _, err := getCACert(ctx, storage)
-	if err != nil {
-		return nil, err
-	}
-
-	metadataEndpoint := op.NewEndpoint(DefaultMetadataEndpoint)
+	metadataEndpoint := NewEndpoint(DefaultMetadataEndpoint)
 	if conf.Metadata != nil {
 		metadataEndpoint = *conf.Metadata
-	}
-
-	issuer := op.IssuerFromHost(HandlerPrefix)
-	issuerFromRequest, err := issuer(conf.Insecure)
-	if err != nil {
-		return nil, err
 	}
 
 	idp, err := NewIdentityProvider(
@@ -121,11 +103,10 @@ func NewProvider(
 	}
 
 	prov := &Provider{
-		metadataEndpoint:  &metadataEndpoint,
-		storage:           storage,
-		conf:              conf,
-		issuerFromRequest: issuerFromRequest,
-		IdentityProvider:  idp,
+		metadataEndpoint: &metadataEndpoint,
+		storage:          storage,
+		conf:             conf,
+		identityProvider: idp,
 	}
 
 	for _, optFunc := range providerOpts {
@@ -133,9 +114,24 @@ func NewProvider(
 			return nil, err
 		}
 	}
+
+	issuerFromRequest, err := IssuerFromHost(path)(prov.insecure)
+	if err != nil {
+		return nil, err
+	}
+	prov.issuerFromRequest = issuerFromRequest
+
 	prov.httpHandler = CreateRouter(prov, prov.interceptors...)
 
 	return prov, nil
+}
+
+func NewID() string {
+	return fmt.Sprintf("_%s", uuid.New())
+}
+
+func (p *Provider) IssuerFromRequest(r *http.Request) string {
+	return p.issuerFromRequest(r)
 }
 
 type Option func(o *Provider) error
@@ -151,22 +147,18 @@ func (p *Provider) HttpHandler() http.Handler {
 	return p.httpHandler
 }
 
-func (p *Provider) Storage() Storage {
-	return p.storage
-}
-
 func (p *Provider) Health(ctx context.Context) error {
-	return p.Storage().Health(ctx)
+	return p.storage.Health(ctx)
 }
 
 func (p *Provider) Probes() []ProbesFn {
 	return []ProbesFn{
-		ReadyStorage(p.Storage()),
+		ReadyStorage(p.storage),
 	}
 }
 
 func (p *Provider) GetMetadata(ctx context.Context) (*md.EntityDescriptorType, error) {
-	metadata, err := p.conf.getMetadata(ctx, p.IdentityProvider)
+	metadata, err := p.conf.getMetadata(ctx, p.identityProvider)
 	if err != nil {
 		return nil, err
 	}
@@ -186,22 +178,6 @@ func (p *Provider) GetMetadata(ctx context.Context) (*md.EntityDescriptorType, e
 
 	}
 	return metadata, nil
-}
-
-func getCACert(ctx context.Context, storage EntityStorage) ([]byte, *rsa.PrivateKey, error) {
-	certAndKey, err := storage.GetCA(ctx)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	if certAndKey.Key.Key == nil || certAndKey.Certificate.Key == nil {
-		return nil, nil, fmt.Errorf("signer has no key")
-	}
-
-	certWebKey := certAndKey.Certificate.Key.(jose.JSONWebKey)
-	keyWebKey := certAndKey.Key.Key.(jose.JSONWebKey)
-
-	return certWebKey.Key.([]byte), keyWebKey.Key.(*rsa.PrivateKey), nil
 }
 
 func getMetadataCert(ctx context.Context, storage EntityStorage) ([]byte, *rsa.PrivateKey, error) {
@@ -230,8 +206,8 @@ func CreateRouter(p *Provider, interceptors ...HttpInterceptor) *mux.Router {
 	router.HandleFunc(readinessEndpoint, readyHandler(p.Probes()))
 	router.HandleFunc(p.metadataEndpoint.Relative(), p.metadataHandle)
 
-	if p.IdentityProvider != nil {
-		for _, route := range p.IdentityProvider.GetRoutes() {
+	if p.identityProvider != nil {
+		for _, route := range p.identityProvider.GetRoutes() {
 			router.Handle(route.Endpoint, route.HandleFunc)
 		}
 	}
@@ -245,21 +221,30 @@ var allowAllOrigins = func(_ string) bool {
 //AuthCallbackURL builds the url for the redirect (with the requestID) after a successful login
 func AuthCallbackURL(p *Provider) func(context.Context, string) string {
 	return func(ctx context.Context, requestID string) string {
-		return p.IdentityProvider.endpoints.CallbackEndpoint.Absolute(op.IssuerFromContext(ctx)) + "?id=" + requestID
+		return p.identityProvider.endpoints.callbackEndpoint.Absolute(IssuerFromContext(ctx)) + "?id=" + requestID
 	}
 }
 
-func intercept(i op.IssuerFromRequest, interceptors ...HttpInterceptor) func(handler http.Handler) http.Handler {
+func intercept(i IssuerFromRequest, interceptors ...HttpInterceptor) func(handler http.Handler) http.Handler {
 	cors := handlers.CORS(
 		handlers.AllowCredentials(),
 		handlers.AllowedHeaders([]string{"authorization", "content-type"}),
 		handlers.AllowedOriginValidator(allowAllOrigins),
 	)
-	issuerInterceptor := op.NewIssuerInterceptor(i)
+	issuerInterceptor := NewIssuerInterceptor(i)
 	return func(handler http.Handler) http.Handler {
 		for i := len(interceptors) - 1; i >= 0; i-- {
 			handler = interceptors[i](handler)
 		}
 		return cors(issuerInterceptor.Handler(handler))
+	}
+}
+
+//WithAllowInsecure allows the use of http (instead of https) for issuers
+//this is not recommended for production use and violates the SAML specification
+func WithAllowInsecure() Option {
+	return func(p *Provider) error {
+		p.insecure = true
+		return nil
 	}
 }

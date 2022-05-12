@@ -4,7 +4,6 @@ import (
 	"context"
 	"github.com/golang/mock/gomock"
 	dsig "github.com/russellhaering/goxmldsig"
-	"github.com/zitadel/oidc/v2/pkg/op"
 	"github.com/zitadel/saml/pkg/provider/mock"
 	"io/ioutil"
 	"net/http"
@@ -222,7 +221,7 @@ func TestSSO_loginHandleFunc(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			endpoint := op.NewEndpoint(tt.args.metadataEndpoint)
+			endpoint := NewEndpoint(tt.args.metadataEndpoint)
 
 			mockStorage := idpStorageWithResponseCertAndApp(
 				t,
@@ -254,7 +253,7 @@ func TestSSO_loginHandleFunc(t *testing.T) {
 				return
 			}
 
-			callURL := idp.endpoints.CallbackEndpoint.Relative() + "?id=" + tt.args.request.ID
+			callURL := idp.endpoints.callbackEndpoint.Relative() + "?id=" + tt.args.request.ID
 			w := httptest.NewRecorder()
 
 			req := httptest.NewRequest(http.MethodGet, callURL, nil)
@@ -312,7 +311,7 @@ func idpStorageWithResponseCertAndApp(
 	return mockStorage
 }
 
-func getEndpointPointer(path, url string) *op.Endpoint {
-	endpoint := op.NewEndpointWithURL(path, url)
+func getEndpointPointer(path, url string) *Endpoint {
+	endpoint := NewEndpointWithURL(path, url)
 	return &endpoint
 }

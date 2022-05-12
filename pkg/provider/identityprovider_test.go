@@ -5,7 +5,6 @@ import (
 	"crypto/rsa"
 	"crypto/x509"
 	"encoding/pem"
-	"github.com/zitadel/oidc/v2/pkg/op"
 	"github.com/zitadel/saml/pkg/provider/key"
 	"github.com/zitadel/saml/pkg/provider/mock"
 
@@ -166,7 +165,7 @@ func TestIDP_certificateHandleFunc(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			endpoint := op.NewEndpoint(tt.args.metadataEndpoint)
+			endpoint := NewEndpoint(tt.args.metadataEndpoint)
 			mockStorage := idpStorageWithResponseCert(t, []byte(tt.args.certificate), []byte(tt.args.key))
 			if mockStorage == nil {
 				return
@@ -181,7 +180,7 @@ func TestIDP_certificateHandleFunc(t *testing.T) {
 				return
 			}
 
-			req := httptest.NewRequest(http.MethodGet, idp.endpoints.CertificateEndpoint.Relative(), nil)
+			req := httptest.NewRequest(http.MethodGet, idp.endpoints.certificateEndpoint.Relative(), nil)
 			w := httptest.NewRecorder()
 
 			callHandlerFuncWithIssuerInterceptor(tt.args.issuer, w, req, idp.certificateHandleFunc)
@@ -250,7 +249,7 @@ func callHandlerFuncWithIssuerInterceptor(issuer string, w http.ResponseWriter, 
 	issuerFromRequest := func(r *http.Request) string {
 		return issuer
 	}
-	interceptor := op.NewIssuerInterceptor(issuerFromRequest)
+	interceptor := NewIssuerInterceptor(issuerFromRequest)
 
 	intercepted := interceptor.HandlerFunc(handlerFunc)
 	intercepted(w, r)

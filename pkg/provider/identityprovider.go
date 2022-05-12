@@ -6,7 +6,6 @@ import (
 	"crypto/rsa"
 	"encoding/pem"
 	"fmt"
-	"github.com/zitadel/oidc/v2/pkg/op"
 	"github.com/zitadel/saml/pkg/provider/serviceprovider"
 	"github.com/zitadel/saml/pkg/provider/xml/md"
 	"github.com/zitadel/saml/pkg/provider/xml/samlp"
@@ -15,6 +14,7 @@ import (
 	"net/http"
 	"reflect"
 	"text/template"
+	"time"
 )
 
 const (
@@ -33,7 +33,7 @@ type IDPStorage interface {
 }
 
 type MetadataIDPConfig struct {
-	ValidUntil    string
+	ValidUntil    time.Duration
 	CacheDuration string
 	ErrorURL      string
 }
@@ -52,11 +52,11 @@ type IdentityProviderConfig struct {
 }
 
 type EndpointConfig struct {
-	Certificate  *op.Endpoint `yaml:"Certificate"`
-	Callback     *op.Endpoint `yaml:"Callback"`
-	SingleSignOn *op.Endpoint `yaml:"SingleSignOn"`
-	SingleLogOut *op.Endpoint `yaml:"SingleLogOut"`
-	Attribute    *op.Endpoint `yaml:"Attribute"`
+	Certificate  *Endpoint `yaml:"Certificate"`
+	Callback     *Endpoint `yaml:"Callback"`
+	SingleSignOn *Endpoint `yaml:"SingleSignOn"`
+	SingleLogOut *Endpoint `yaml:"SingleLogOut"`
+	Attribute    *Endpoint `yaml:"Attribute"`
 }
 
 type IdentityProvider struct {
@@ -65,25 +65,23 @@ type IdentityProvider struct {
 	postTemplate   *template.Template
 	logoutTemplate *template.Template
 
-	metadataEndpoint *op.Endpoint
+	metadataEndpoint *Endpoint
 
 	metadata   *md.IDPSSODescriptorType
 	aaMetadata *md.AttributeAuthorityDescriptorType
 
 	endpoints *Endpoints
-
-	serviceProviders []*serviceprovider.ServiceProvider
 }
 
 type Endpoints struct {
-	CertificateEndpoint  op.Endpoint
-	CallbackEndpoint     op.Endpoint
-	SingleSignOnEndpoint op.Endpoint
-	SingleLogoutEndpoint op.Endpoint
-	AttributeEndpoint    op.Endpoint
+	certificateEndpoint  Endpoint
+	callbackEndpoint     Endpoint
+	singleSignOnEndpoint Endpoint
+	singleLogoutEndpoint Endpoint
+	attributeEndpoint    Endpoint
 }
 
-func NewIdentityProvider(ctx context.Context, metadata op.Endpoint, conf *IdentityProviderConfig, storage IDPStorage) (*IdentityProvider, error) {
+func NewIdentityProvider(ctx context.Context, metadata Endpoint, conf *IdentityProviderConfig, storage IDPStorage) (*IdentityProvider, error) {
 	postTemplate, err := template.New("post").Parse(postTemplate)
 	if err != nil {
 		return nil, err
@@ -103,49 +101,55 @@ func NewIdentityProvider(ctx context.Context, metadata op.Endpoint, conf *Identi
 		endpoints:        endpointConfigToEndpoints(conf.Endpoints),
 	}
 
+	if conf.MetadataIDPConfig == nil {
+		conf.MetadataIDPConfig = &MetadataIDPConfig{}
+	}
+	/*
+		if conf.MetadataIDPConfig.CacheDuration == "" {
+			conf.MetadataIDPConfig.CacheDuration = DefaultCacheDuration
+		}*/
+	if conf.MetadataIDPConfig.ValidUntil == 0 {
+		conf.MetadataIDPConfig.ValidUntil = DefaultValidUntil
+	}
+
 	return idp, nil
 }
 
 func (p *IdentityProvider) GetEntityID(ctx context.Context) string {
-	return p.metadataEndpoint.Absolute(op.IssuerFromContext(ctx))
+	return p.metadataEndpoint.Absolute(IssuerFromContext(ctx))
 }
 
 func endpointConfigToEndpoints(conf *EndpointConfig) *Endpoints {
 	endpoints := &Endpoints{
-		CertificateEndpoint:  op.NewEndpoint(DefaultCertificateEndpoint),
-		CallbackEndpoint:     op.NewEndpoint(DefaultCallbackEndpoint),
-		SingleSignOnEndpoint: op.NewEndpoint(DefaultSingleSignOnEndpoint),
-		SingleLogoutEndpoint: op.NewEndpoint(DefaultSingleLogOutEndpoint),
-		AttributeEndpoint:    op.NewEndpoint(DefaultAttributeEndpoint),
+		certificateEndpoint:  NewEndpoint(DefaultCertificateEndpoint),
+		callbackEndpoint:     NewEndpoint(DefaultCallbackEndpoint),
+		singleSignOnEndpoint: NewEndpoint(DefaultSingleSignOnEndpoint),
+		singleLogoutEndpoint: NewEndpoint(DefaultSingleLogOutEndpoint),
+		attributeEndpoint:    NewEndpoint(DefaultAttributeEndpoint),
 	}
 
 	if conf != nil {
 		if conf.Certificate != nil {
-			endpoints.CertificateEndpoint = *conf.Certificate
+			endpoints.certificateEndpoint = *conf.Certificate
 		}
 
 		if conf.Callback != nil {
-			endpoints.CallbackEndpoint = *conf.Callback
+			endpoints.callbackEndpoint = *conf.Callback
 		}
 
 		if conf.SingleSignOn != nil {
-			endpoints.SingleSignOnEndpoint = *conf.SingleSignOn
+			endpoints.singleSignOnEndpoint = *conf.SingleSignOn
 		}
 
 		if conf.SingleLogOut != nil {
-			endpoints.SingleLogoutEndpoint = *conf.SingleLogOut
+			endpoints.singleLogoutEndpoint = *conf.SingleLogOut
 		}
 
 		if conf.Attribute != nil {
-			endpoints.AttributeEndpoint = *conf.Attribute
+			endpoints.attributeEndpoint = *conf.Attribute
 		}
 	}
 	return endpoints
-}
-
-type Route struct {
-	Endpoint   string
-	HandleFunc http.HandlerFunc
 }
 
 func (p *IdentityProvider) GetMetadata(ctx context.Context) (*md.IDPSSODescriptorType, *md.AttributeAuthorityDescriptorType, error) {
@@ -158,54 +162,23 @@ func (p *IdentityProvider) GetMetadata(ctx context.Context) (*md.IDPSSODescripto
 	return metadata, aaMetadata, nil
 }
 
+type Route struct {
+	Endpoint   string
+	HandleFunc http.HandlerFunc
+}
+
 func (p *IdentityProvider) GetRoutes() []*Route {
 	return []*Route{
-		{p.endpoints.CertificateEndpoint.Relative(), p.certificateHandleFunc},
-		{p.endpoints.CallbackEndpoint.Relative(), p.callbackHandleFunc},
-		{p.endpoints.SingleSignOnEndpoint.Relative(), p.ssoHandleFunc},
-		{p.endpoints.SingleLogoutEndpoint.Relative(), p.logoutHandleFunc},
-		{p.endpoints.AttributeEndpoint.Relative(), p.attributeQueryHandleFunc},
+		{p.endpoints.certificateEndpoint.Relative(), p.certificateHandleFunc},
+		{p.endpoints.callbackEndpoint.Relative(), p.callbackHandleFunc},
+		{p.endpoints.singleSignOnEndpoint.Relative(), p.ssoHandleFunc},
+		{p.endpoints.singleLogoutEndpoint.Relative(), p.logoutHandleFunc},
+		{p.endpoints.attributeEndpoint.Relative(), p.attributeQueryHandleFunc},
 	}
 }
 
 func (p *IdentityProvider) GetServiceProvider(ctx context.Context, entityID string) (*serviceprovider.ServiceProvider, error) {
-	index := 0
-	found := false
-	for i, sp := range p.serviceProviders {
-		if sp.GetEntityID() == entityID {
-			found = true
-			index = i
-			break
-		}
-	}
-	if found == true {
-		return p.serviceProviders[index], nil
-	}
-
-	sp, err := p.storage.GetEntityByID(ctx, entityID)
-	if err != nil {
-		return nil, err
-	}
-	if sp != nil {
-		p.serviceProviders = append(p.serviceProviders, sp)
-	}
-	return sp, nil
-}
-
-func (p *IdentityProvider) DeleteServiceProvider(entityID string) error {
-	index := 0
-	found := false
-	for i, sp := range p.serviceProviders {
-		if sp.GetEntityID() == entityID {
-			found = true
-			index = i
-			break
-		}
-	}
-	if found == true {
-		p.serviceProviders = append(p.serviceProviders[:index], p.serviceProviders[index+1:]...)
-	}
-	return nil
+	return p.storage.GetEntityByID(ctx, entityID)
 }
 
 func verifyRequestDestinationOfAuthRequest(metadata *md.IDPSSODescriptorType, request *samlp.AuthnRequestType) error {
@@ -281,7 +254,7 @@ func (i *IdentityProvider) certificateHandleFunc(w http.ResponseWriter, r *http.
 		http.Error(w, fmt.Errorf("failed to read certificate: %w", err).Error(), http.StatusInternalServerError)
 		return
 	}
-	fmt.Printf(op.IssuerFromContext(r.Context()))
+	fmt.Printf(IssuerFromContext(r.Context()))
 
 	certPem := new(bytes.Buffer)
 	if err := pem.Encode(certPem, &pem.Block{

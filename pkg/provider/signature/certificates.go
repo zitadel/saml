@@ -102,7 +102,7 @@ func GetSigner(
 
 	signer, err := xmlsig.NewSignerWithOptions(tlsCert, xmlsig.SignerOptions{
 		SignatureAlgorithm: signatureAlgorithm,
-		DigestAlgorithm:    dsig.CanonicalXML10ExclusiveAlgorithmId.String(),
+		DigestAlgorithm:    "http://www.w3.org/2001/04/xmlenc#sha256",
 	})
 	if err != nil {
 		return nil, err
