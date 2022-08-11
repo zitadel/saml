@@ -102,10 +102,6 @@ func NewIdentityProvider(ctx context.Context, metadata Endpoint, conf *IdentityP
 	if conf.MetadataIDPConfig == nil {
 		conf.MetadataIDPConfig = &MetadataIDPConfig{}
 	}
-	/*
-		if conf.MetadataIDPConfig.CacheDuration == "" {
-			conf.MetadataIDPConfig.CacheDuration = DefaultCacheDuration
-		}*/
 	if conf.MetadataIDPConfig.ValidUntil == 0 {
 		conf.MetadataIDPConfig.ValidUntil = DefaultValidUntil
 	}
@@ -233,7 +229,7 @@ func getResponseCert(ctx context.Context, storage IdentityProviderStorage) ([]by
 		return nil, nil, fmt.Errorf("certificate is nil")
 	}
 	cert, ok := certWebKey.Key.([]byte)
-	if !ok || cert == nil {
+	if !ok || len(cert) == 0 {
 		return nil, nil, fmt.Errorf("failed to parse certificate")
 	}
 

@@ -17,8 +17,7 @@ import (
 )
 
 const (
-	DefaultValidUntil    time.Duration = 5 * time.Minute
-	DefaultCacheDuration string        = "PT300S"
+	DefaultValidUntil = 5 * time.Minute
 )
 
 func (p *Provider) metadataHandle(w http.ResponseWriter, r *http.Request) {
