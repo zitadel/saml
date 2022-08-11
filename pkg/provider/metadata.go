@@ -5,13 +5,15 @@ import (
 	"encoding/base64"
 	"encoding/xml"
 	"fmt"
+	"net/http"
+	"time"
+
 	"github.com/zitadel/logging"
+
 	saml_xml "github.com/zitadel/saml/pkg/provider/xml"
 	"github.com/zitadel/saml/pkg/provider/xml/md"
 	"github.com/zitadel/saml/pkg/provider/xml/xenc"
 	"github.com/zitadel/saml/pkg/provider/xml/xml_dsig"
-	"net/http"
-	"time"
 )
 
 const (
@@ -23,7 +25,7 @@ func (p *Provider) metadataHandle(w http.ResponseWriter, r *http.Request) {
 	metadata, err := p.GetMetadata(r.Context())
 	if err != nil {
 		err := fmt.Errorf("error while getting metadata: %w", err)
-		logging.Log("SAML-mp2ok3").Error(err)
+		logging.Error(err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
@@ -108,17 +110,7 @@ func (p *IdentityProviderConfig) getMetadata(
 				"urn:oasis:names:tc:SAML:2.0:profiles:attribute:basic",
 			},
 			Attribute: attrsSaml,
-			/*	ArtifactResolutionService: []md.IndexedEndpointType{{
-				Index:     "0",
-				IsDefault: "true",
-				Binding:   SOAPBinding,
-				Location:  p.Endpoints.Artifact.URL,
-			}},*/
 			SingleLogoutService: []md.EndpointType{
-				/*{
-					Binding:  SOAPBinding,
-					Location: p.Endpoints.SLOArtifact.URL,
-				},*/
 				{
 					Binding:  RedirectBinding,
 					Location: endpoints.singleLogoutEndpoint.Absolute(IssuerFromContext(ctx)),
@@ -134,11 +126,6 @@ func (p *IdentityProviderConfig) getMetadata(
 
 			Organization:  nil,
 			ContactPerson: nil,
-			/*
-				NameIDMappingService: nil,
-				AssertionIDRequestService: nil,
-				ManageNameIDService: nil,
-			*/
 		},
 		&md.AttributeAuthorityDescriptorType{
 			XMLName:                    xml.Name{},
@@ -162,10 +149,6 @@ func (p *IdentityProviderConfig) getMetadata(
 
 			Organization:  nil,
 			ContactPerson: nil,
-
-			/*
-				AssertionIDRequestService: nil,
-			*/
 		}
 }
 
@@ -181,11 +164,6 @@ func (c *Config) getMetadata(
 		Signature:     nil,
 		Organization:  nil,
 		ContactPerson: nil,
-		/*
-			AuthnAuthorityDescriptor:     nil,
-			PDPDescriptor:         nil,
-			AffiliationDescriptor: nil,
-		*/
 	}
 
 	if c.IDPConfig != nil {

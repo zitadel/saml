@@ -5,12 +5,13 @@ import (
 	"bytes"
 	"encoding/base64"
 	"encoding/xml"
-	"github.com/zitadel/saml/pkg/provider/xml/saml"
-	"github.com/zitadel/saml/pkg/provider/xml/samlp"
 	"net/http"
 	"net/url"
 	"text/template"
 	"time"
+
+	"github.com/zitadel/saml/pkg/provider/xml/saml"
+	"github.com/zitadel/saml/pkg/provider/xml/samlp"
 )
 
 type LogoutResponse struct {

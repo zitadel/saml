@@ -21,10 +21,10 @@ func (c *Checker) CheckFailed() bool {
 	return false
 }
 
-func (c *Checker) WithValueNotEmptyCheck(valueName string, value func() string, errorLogID string, errorFunc func()) *Checker {
+func (c *Checker) WithValueNotEmptyCheck(valueName string, value func() string, errorFunc func()) *Checker {
 	c.addStep(func() bool {
 		if value() == "" {
-			logging.Log(errorLogID).Errorf("empty value %s", valueName)
+			logging.Errorf("empty value %s", valueName)
 			errorFunc()
 			return true
 		}
@@ -34,11 +34,11 @@ func (c *Checker) WithValueNotEmptyCheck(valueName string, value func() string, 
 	return c
 }
 
-func (c *Checker) WithValuesNotEmptyCheck(values func() []string, errorLogID string, errorFunc func()) *Checker {
+func (c *Checker) WithValuesNotEmptyCheck(values func() []string, errorFunc func()) *Checker {
 	c.addStep(func() bool {
 		for _, value := range values() {
 			if value == "" {
-				logging.Log(errorLogID).Errorf("empty value")
+				logging.Errorf("empty value")
 				errorFunc()
 				return true
 			}
@@ -48,10 +48,10 @@ func (c *Checker) WithValuesNotEmptyCheck(values func() []string, errorLogID str
 	return c
 }
 
-func (c *Checker) WithValueLengthCheck(valueName string, value func() string, minlength, maxlength int, errorLogID string, errorFunc func()) *Checker {
+func (c *Checker) WithValueLengthCheck(valueName string, value func() string, minlength, maxlength int, errorFunc func()) *Checker {
 	c.addStep(func() bool {
 		if (minlength > 0 && len(value()) < minlength) || (maxlength > 0 && len(value()) > maxlength) {
-			logging.Log(errorLogID).Errorf("error with value length %s", valueName)
+			logging.Errorf("error with value length %s", valueName)
 			errorFunc()
 			return true
 		}
@@ -62,10 +62,10 @@ func (c *Checker) WithValueLengthCheck(valueName string, value func() string, mi
 	return c
 }
 
-func (c *Checker) WithValueEqualsCheck(valueName string, value func() string, equal func() string, errorLogID string, errorFunc func()) *Checker {
+func (c *Checker) WithValueEqualsCheck(valueName string, value func() string, equal func() string, errorFunc func()) *Checker {
 	c.addStep(func() bool {
 		if value() != equal() {
-			logging.Log(errorLogID).Errorf("value not equal %s: %s, %s", valueName, value(), equal())
+			logging.Errorf("value not equal %s: %s, %s", valueName, value(), equal())
 			errorFunc()
 			return true
 		}
@@ -76,11 +76,11 @@ func (c *Checker) WithValueEqualsCheck(valueName string, value func() string, eq
 	return c
 }
 
-func (c *Checker) WithConditionalValueNotEmpty(cond func() bool, valueName string, value func() string, errorLogID string, errorFunc func()) *Checker {
+func (c *Checker) WithConditionalValueNotEmpty(cond func() bool, valueName string, value func() string, errorFunc func()) *Checker {
 	c.addStep(func() bool {
 		if cond() {
 			if value() == "" {
-				logging.Log(errorLogID).Errorf("empty value %s", valueName)
+				logging.Errorf("empty value %s", valueName)
 				errorFunc()
 				return true
 			}
@@ -91,11 +91,11 @@ func (c *Checker) WithConditionalValueNotEmpty(cond func() bool, valueName strin
 	return c
 }
 
-func (c *Checker) WithConditionalLogicStep(cond func() bool, logic func() error, errorLogID string, errorFunc func()) *Checker {
+func (c *Checker) WithConditionalLogicStep(cond func() bool, logic func() error, errorFunc func()) *Checker {
 	c.addStep(func() bool {
 		if cond() {
 			if err := logic(); err != nil {
-				logging.Log(errorLogID).Error(err)
+				logging.Error(err)
 				errorFunc()
 				return true
 			}
@@ -106,10 +106,10 @@ func (c *Checker) WithConditionalLogicStep(cond func() bool, logic func() error,
 	return c
 }
 
-func (c *Checker) WithLogicStep(logic func() error, errorLogID string, errorFunc func()) *Checker {
+func (c *Checker) WithLogicStep(logic func() error, errorFunc func()) *Checker {
 	c.addStep(func() bool {
 		if err := logic(); err != nil {
-			logging.Log(errorLogID).Error(err)
+			logging.Error(err)
 			errorFunc()
 			return true
 		}

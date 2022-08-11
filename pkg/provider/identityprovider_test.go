@@ -5,16 +5,17 @@ import (
 	"crypto/rsa"
 	"crypto/x509"
 	"encoding/pem"
+	"io/ioutil"
+	"net/http"
+	"net/http/httptest"
+	"testing"
+
 	"github.com/zitadel/saml/pkg/provider/key"
 	"github.com/zitadel/saml/pkg/provider/mock"
 
 	"github.com/golang/mock/gomock"
 	dsig "github.com/russellhaering/goxmldsig"
 	"gopkg.in/square/go-jose.v2"
-	"io/ioutil"
-	"net/http"
-	"net/http/httptest"
-	"testing"
 )
 
 func TestIDP_certificateHandleFunc(t *testing.T) {
@@ -108,24 +109,6 @@ func TestIDP_certificateHandleFunc(t *testing.T) {
 			},
 		},
 		{
-			"key with certificate empty",
-			args{
-				metadataEndpoint: "/saml/metadata",
-				issuer:           "http://localhost:50002",
-				config: &IdentityProviderConfig{
-					SignatureAlgorithm: dsig.RSASHA256SignatureMethod,
-					MetadataIDPConfig:  &MetadataIDPConfig{},
-					Endpoints:          &EndpointConfig{},
-				},
-				certificate: []byte(""),
-				key:         []byte("-----BEGIN PRIVATE KEY-----\nMIIEvQIBADANBgkqhkiG9w0BAQEFAASCBKcwggSjAgEAAoIBAQC7XKdCRxUZXjdq\nVqwwwOJqc1Ch0nOSmk+UerkUqlviWHdeLR+FolHKjqLzCBloAz4xVc0DFfR76gWc\nWAHJloqZ7GBS7NpDhzV8G+cXQ+bTU0Lu2e73zCQb30XUdKhWiGfDKaU+1xg9CD/2\ngIfsYPs3TTq1sq7oCs5qLdUHaVL5kcRaHKdnTi7cs5i9xzs3TsUnXcrJPwydjp+a\nEkyRh07oMpXBEobGisfF2p1MA6pVW2gjmywf7D5iYEFELQhM7poqPN3/kfBvU1n7\nLfgq7oxmv/8LFi4Zopr5nyqsz26XPtUy1WqTzgznAmP+nN0oBTERFVbXXdRa3k2v\n4cxTNPn/AgMBAAECggEAF+rV9yH30Ysza8GwrXCR9qDN1Dp3QmmsavnXkonEvPoq\nEr2T3o0//6mBp6CLDboMQGQBjblJwl+3Y6PgZolvHAMOsMdHfYNPEo7FSzUBzEw+\nqRrs5HkMyvoPgfV6X8F97W3tiD4Q/AmHkMILl+MxbnfPXM54gWqPuwIqxY1uaCk5\nREwyb7WBon3rd58ceOI1SLRjod6SbqWBMMSN3cJ+5VEPObFjw/RlhNQ5rBI8G5Kt\nso2zBU5C4BB2CvqlWy98WDKJkTvWHbiTjZCy8BQ+gQ6UJM2vaNELFOVpuMGQnMIi\noWiX10Jg2e1gP9j3TdrohlGF8M3+TXjSFKNmeX0DUQKBgQDx7UazUWS5RtkgnjH9\nw2xH2xkstJVD7nAS8VTxNwcrgjVXPvTJha9El904obUjyRX7ppb02tuH5ML/bZh6\n9lL4bP5+SHcJ10e4q8CK/KAGHD6BYAbaGXRq0CoSk5a3vv5XPdob4T5qKCIHFpnu\nMfbvdbEoameLOyRYOGu/yVZIiwKBgQDGQs7FRTisHV0xooiRmlvYF0dcd19qpLed\nqhgJNqBPOTEvvGvJNRoi39haEY3cuTqsxZ5FAlFlVFMUUozz+d0xBLLInoVY/Y4h\nhSdGmdw/A6oHodLqyEp3N5RZNdLlh8/nDS3xXzMotAl75bW5kc2ttcRhRdtyNJ9Z\nup0PgppO3QKBgEC45upAQz8iCiKkz+EA8C4FGqYQJcLHvmoC8GOcAioMqrKNoDVt\ns2cZbdChynEpcd0iQ058YrDnbZeiPWHgFnBp0Gf+gQI7+u8X2+oTDci0s7Au/YZJ\nuxB8YlUX8QF1clvqqzg8OVNzKy9UR5gm+9YyWVPjq5HfH6kOZx0nAxNjAoGAERt8\nqgsCC9/wxbKnpCC0oh3IG5N1WUdjTKh7sHfVN2DQ/LR+fHsniTDVg1gWbKBTDsty\nj7PWgC7ZiFxjKz45NtyX7LW4/efLFttdezsVhR500nnFMFseCdFy7Iu3afThHKfH\nehdj27RFSTqWBrAtFjsj+dzERcOCqIRwvwDe/cUCgYEA5+1mzVXDVjKsWylKJPk+\nZZA4LUfvmTj3VLNDZrlSAI/xEikCFio0QWEA2TQYTAwbXTrKwQSeHQRhv7OTc1h+\nMhpAgvs189ze5J4jiNmULEkkrO+Cxxnw8tyV+UFRZtzW9gUoVBwXiZ/Wbl9sfnlO\nwLJHc0j6OltPcPJmxHP8gQI=\n-----END PRIVATE KEY-----\n"),
-			},
-			res{
-				code: 500,
-				err:  false,
-			},
-		},
-		{
 			"certificate with key nil",
 			args{
 				metadataEndpoint: "/saml/metadata",
@@ -166,7 +149,7 @@ func TestIDP_certificateHandleFunc(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			endpoint := NewEndpoint(tt.args.metadataEndpoint)
-			mockStorage := idpStorageWithResponseCert(t, []byte(tt.args.certificate), []byte(tt.args.key))
+			mockStorage := idpStorageWithResponseCert(t, tt.args.certificate, tt.args.key)
 			if mockStorage == nil {
 				return
 			}
@@ -203,10 +186,8 @@ func TestIDP_certificateHandleFunc(t *testing.T) {
 func idpStorageWithResponseCert(t *testing.T, cert []byte, pKey []byte) *mock.MockIDPStorage {
 	mockStorage := mock.NewMockIDPStorage(gomock.NewController(t))
 	certAndKey := &key.CertificateAndKey{
-		Certificate: &jose.SigningKey{},
-		Key: &jose.SigningKey{
-			Key: jose.JSONWebKey{},
-		},
+		Certificate: nil,
+		Key:         nil,
 	}
 
 	if cert != nil {
@@ -218,7 +199,9 @@ func idpStorageWithResponseCert(t *testing.T, cert []byte, pKey []byte) *mock.Mo
 			}
 			certBytes = blockCert.Bytes
 		}
-
+		if certAndKey.Certificate == nil {
+			certAndKey.Certificate = &jose.SigningKey{}
+		}
 		certAndKey.Certificate.Key = jose.JSONWebKey{
 			Key: certBytes,
 		}
@@ -236,6 +219,11 @@ func idpStorageWithResponseCert(t *testing.T, cert []byte, pKey []byte) *mock.Mo
 			}
 			priv = privT.(*rsa.PrivateKey)
 		}
+
+		if certAndKey.Key == nil {
+			certAndKey.Key = &jose.SigningKey{}
+		}
+
 		certAndKey.Key.Key = jose.JSONWebKey{
 			Key: priv,
 		}

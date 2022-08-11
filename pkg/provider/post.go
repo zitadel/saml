@@ -3,12 +3,13 @@ package provider
 import (
 	"context"
 	"encoding/base64"
+	"reflect"
+
 	"github.com/zitadel/saml/pkg/provider/serviceprovider"
 	"github.com/zitadel/saml/pkg/provider/signature"
 	"github.com/zitadel/saml/pkg/provider/xml/md"
 	"github.com/zitadel/saml/pkg/provider/xml/samlp"
 	"github.com/zitadel/saml/pkg/provider/xml/xml_dsig"
-	"reflect"
 )
 
 func signaturePostProvided(

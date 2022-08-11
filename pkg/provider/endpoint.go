@@ -26,10 +26,6 @@ func (e Endpoint) Absolute(host string) string {
 	return absoluteEndpoint(host, e.path)
 }
 
-func (e Endpoint) Validate() error {
-	return nil //TODO:
-}
-
 func absoluteEndpoint(host, endpoint string) string {
 	return strings.TrimSuffix(host, "/") + relativeEndpoint(endpoint)
 }

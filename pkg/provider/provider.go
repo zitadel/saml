@@ -4,13 +4,15 @@ import (
 	"context"
 	"crypto/rsa"
 	"fmt"
+	"net/http"
+
 	"github.com/google/uuid"
 	"github.com/gorilla/handlers"
 	"github.com/gorilla/mux"
+	"gopkg.in/square/go-jose.v2"
+
 	"github.com/zitadel/saml/pkg/provider/signature"
 	"github.com/zitadel/saml/pkg/provider/xml/md"
-	"gopkg.in/square/go-jose.v2"
-	"net/http"
 )
 
 const (
@@ -190,8 +192,14 @@ func getMetadataCert(ctx context.Context, storage EntityStorage) ([]byte, *rsa.P
 		return nil, nil, fmt.Errorf("signer has no key")
 	}
 
-	certWebKey := certAndKey.Certificate.Key.(jose.JSONWebKey)
-	keyWebKey := certAndKey.Key.Key.(jose.JSONWebKey)
+	certWebKey, ok := certAndKey.Certificate.Key.(jose.JSONWebKey)
+	if !ok {
+		return nil, nil, fmt.Errorf("metadata certificate not in expected format")
+	}
+	keyWebKey, ok := certAndKey.Key.Key.(jose.JSONWebKey)
+	if !ok {
+		return nil, nil, fmt.Errorf("metadata certificate key not in expected format")
+	}
 
 	return certWebKey.Key.([]byte), keyWebKey.Key.(*rsa.PrivateKey), nil
 }

@@ -4,9 +4,10 @@ import (
 	"encoding/base64"
 	"encoding/xml"
 	"fmt"
-	"github.com/zitadel/saml/pkg/provider/xml/md"
 	"io"
 	"net/http"
+
+	"github.com/zitadel/saml/pkg/provider/xml/md"
 )
 
 func ReadMetadataFromURL(url string) ([]byte, error) {

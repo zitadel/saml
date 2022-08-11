@@ -3,19 +3,21 @@ package provider
 import (
 	"context"
 	"fmt"
-	"github.com/golang/mock/gomock"
-	dsig "github.com/russellhaering/goxmldsig"
-	"github.com/zitadel/saml/pkg/provider/mock"
-	"github.com/zitadel/saml/pkg/provider/serviceprovider"
-	"github.com/zitadel/saml/pkg/provider/xml"
-	"github.com/zitadel/saml/pkg/provider/xml/md"
-	"github.com/zitadel/saml/pkg/provider/xml/xml_dsig"
 	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
 	"reflect"
 	"testing"
+
+	"github.com/golang/mock/gomock"
+	dsig "github.com/russellhaering/goxmldsig"
+
+	"github.com/zitadel/saml/pkg/provider/mock"
+	"github.com/zitadel/saml/pkg/provider/serviceprovider"
+	"github.com/zitadel/saml/pkg/provider/xml"
+	"github.com/zitadel/saml/pkg/provider/xml/md"
+	"github.com/zitadel/saml/pkg/provider/xml/xml_dsig"
 )
 
 func TestSSO_getAcsUrlAndBindingForResponse(t *testing.T) {

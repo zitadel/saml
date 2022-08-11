@@ -10,12 +10,14 @@ import (
 	"encoding/asn1"
 	"encoding/xml"
 	"fmt"
+	"math/big"
+
 	"github.com/amdonov/xmlsig"
 	"github.com/beevik/etree"
 	dsig "github.com/russellhaering/goxmldsig"
 	"github.com/russellhaering/goxmldsig/etreeutils"
+
 	"github.com/zitadel/saml/pkg/provider/xml/xml_dsig"
-	"math/big"
 )
 
 /*

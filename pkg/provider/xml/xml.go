@@ -7,11 +7,12 @@ import (
 	"encoding/base64"
 	"encoding/xml"
 	"fmt"
+	"net/http"
+	"strings"
+
 	"github.com/zitadel/saml/pkg/provider/xml/samlp"
 	"github.com/zitadel/saml/pkg/provider/xml/soap"
 	"github.com/zitadel/saml/pkg/provider/xml/xml_dsig"
-	"net/http"
-	"strings"
 )
 
 const (
@@ -113,10 +114,6 @@ func DecodeAuthNRequest(encoding string, message string) (*samlp.AuthnRequestTyp
 
 func DecodeSignature(encoding string, message string) (*xml_dsig.SignatureType, error) {
 	retBytes := []byte(message)
-	/*retBytes, err := base64.StdEncoding.DecodeString(message)
-	if err != nil {
-		return nil, fmt.Errorf("failed to base64 decode: %w", err)
-	}*/
 
 	ret := &xml_dsig.SignatureType{}
 	switch encoding {
@@ -178,10 +175,6 @@ func DecodeLogoutRequest(encoding string, message string) (*samlp.LogoutRequestT
 }
 
 func DecodeResponse(encoding string, message string) (*samlp.ResponseType, error) {
-	/*reqBytes, err := base64.StdEncoding.DecodeString(message)
-	if err != nil {
-		return nil, err
-	}*/
 
 	req := &samlp.ResponseType{}
 	switch encoding {

@@ -4,11 +4,13 @@ import (
 	"crypto/x509"
 	"encoding/base64"
 	"fmt"
+	"net/url"
+
 	"github.com/beevik/etree"
+
 	"github.com/zitadel/saml/pkg/provider/signature"
 	"github.com/zitadel/saml/pkg/provider/xml"
 	"github.com/zitadel/saml/pkg/provider/xml/md"
-	"net/url"
 )
 
 type ServiceProviderConfig struct {

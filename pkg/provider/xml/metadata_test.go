@@ -1,9 +1,10 @@
 package xml_test
 
 import (
-	"github.com/zitadel/saml/pkg/provider/xml"
 	"net/http"
 	"testing"
+
+	"github.com/zitadel/saml/pkg/provider/xml"
 )
 
 func Test_XmlReadMetadataFromURL(t *testing.T) {

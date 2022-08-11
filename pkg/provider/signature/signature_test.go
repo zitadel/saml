@@ -10,18 +10,20 @@ import (
 	"encoding/base64"
 	"encoding/pem"
 	"encoding/xml"
-	"github.com/beevik/etree"
-	dsig "github.com/russellhaering/goxmldsig"
-	"github.com/zitadel/saml/pkg/provider/signature"
-	saml_xml "github.com/zitadel/saml/pkg/provider/xml"
-	"github.com/zitadel/saml/pkg/provider/xml/samlp"
-	"github.com/zitadel/saml/pkg/provider/xml/xml_dsig"
 	"math/big"
 	"math/rand"
 	"regexp"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/beevik/etree"
+	dsig "github.com/russellhaering/goxmldsig"
+
+	"github.com/zitadel/saml/pkg/provider/signature"
+	saml_xml "github.com/zitadel/saml/pkg/provider/xml"
+	"github.com/zitadel/saml/pkg/provider/xml/samlp"
+	"github.com/zitadel/saml/pkg/provider/xml/xml_dsig"
 )
 
 func TestSignature_ValidatePost(t *testing.T) {
@@ -379,6 +381,21 @@ func TestSignature_CreatePost(t *testing.T) {
 				digestMethod:     xml_dsig.DigestMethodSHA1,
 				transforms:       []string{dsig.EnvelopedSignatureAltorithmId.String(), dsig.CanonicalXML10ExclusiveAlgorithmId.String()},
 				err:              false,
+			},
+		},
+		{
+			name: "unsupported signature algorithm",
+			args: args{
+				response:           "<samlp:Response xmlns:samlp=\"urn:oasis:names:tc:SAML:2.0:protocol\" xmlns:saml=\"urn:oasis:names:tc:SAML:2.0:assertion\" ID=\"_8e8dc5f69a98cc4c1ff3427e5ce34606fd672f91e6\" Version=\"2.0\" IssueInstant=\"2014-07-17T01:01:48Z\" Destination=\"http://sp.example.com/demo1/index.php?acs\" InResponseTo=\"ONELOGIN_4fee3b046395c4e751011e97f8900b5273d56685\">\n  <saml:Issuer>http://idp.example.com/metadata.php</saml:Issuer>\n  <samlp:Status>\n    <samlp:StatusCode Value=\"urn:oasis:names:tc:SAML:2.0:status:Success\"/>\n  </samlp:Status>\n  <saml:Assertion xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\" xmlns:xs=\"http://www.w3.org/2001/XMLSchema\" ID=\"_d71a3a8e9fcc45c9e9d248ef7049393fc8f04e5f75\" Version=\"2.0\" IssueInstant=\"2014-07-17T01:01:48Z\">\n    <saml:Issuer>http://idp.example.com/metadata.php</saml:Issuer>\n    <saml:Subject>\n      <saml:NameID SPNameQualifier=\"http://sp.example.com/demo1/metadata.php\" Format=\"urn:oasis:names:tc:SAML:2.0:nameid-format:transient\">_ce3d2948b4cf20146dee0a0b3dd6f69b6cf86f62d7</saml:NameID>\n      <saml:SubjectConfirmation Method=\"urn:oasis:names:tc:SAML:2.0:cm:bearer\">\n        <saml:SubjectConfirmationData NotOnOrAfter=\"2024-01-18T06:21:48Z\" Recipient=\"http://sp.example.com/demo1/index.php?acs\" InResponseTo=\"ONELOGIN_4fee3b046395c4e751011e97f8900b5273d56685\"/>\n      </saml:SubjectConfirmation>\n    </saml:Subject>\n    <saml:Conditions NotBefore=\"2014-07-17T01:01:18Z\" NotOnOrAfter=\"2024-01-18T06:21:48Z\">\n      <saml:AudienceRestriction>\n        <saml:Audience>http://sp.example.com/demo1/metadata.php</saml:Audience>\n      </saml:AudienceRestriction>\n    </saml:Conditions>\n    <saml:AuthnStatement AuthnInstant=\"2014-07-17T01:01:48Z\" SessionNotOnOrAfter=\"2024-07-17T09:01:48Z\" SessionIndex=\"_be9967abd904ddcae3c0eb4189adbe3f71e327cf93\">\n      <saml:AuthnContext>\n        <saml:AuthnContextClassRef>urn:oasis:names:tc:SAML:2.0:ac:classes:Password</saml:AuthnContextClassRef>\n      </saml:AuthnContext>\n    </saml:AuthnStatement>\n    <saml:AttributeStatement>\n      <saml:Attribute Name=\"uid\" NameFormat=\"urn:oasis:names:tc:SAML:2.0:attrname-format:basic\">\n        <saml:AttributeValue xsi:type=\"xs:string\">test</saml:AttributeValue>\n      </saml:Attribute>\n      <saml:Attribute Name=\"mail\" NameFormat=\"urn:oasis:names:tc:SAML:2.0:attrname-format:basic\">\n        <saml:AttributeValue xsi:type=\"xs:string\">test@example.com</saml:AttributeValue>\n      </saml:Attribute>\n      <saml:Attribute Name=\"eduPersonAffiliation\" NameFormat=\"urn:oasis:names:tc:SAML:2.0:attrname-format:basic\">\n        <saml:AttributeValue xsi:type=\"xs:string\">users</saml:AttributeValue>\n        <saml:AttributeValue xsi:type=\"xs:string\">examplerole1</saml:AttributeValue>\n      </saml:Attribute>\n    </saml:AttributeStatement>\n  </saml:Assertion>\n</samlp:Response>",
+				singatureAlgorithm: "whatever",
+				canonicalizer:      dsig.MakeC14N10ExclusiveCanonicalizerWithPrefixList(""),
+			},
+			res: res{
+				canonicalization: dsig.CanonicalXML10ExclusiveAlgorithmId.String(),
+				signatureMethod:  "whatever",
+				digestMethod:     xml_dsig.DigestMethodSHA1,
+				transforms:       []string{dsig.EnvelopedSignatureAltorithmId.String(), dsig.CanonicalXML10ExclusiveAlgorithmId.String()},
+				err:              true,
 			},
 		},
 		{

@@ -6,15 +6,17 @@ import (
 	"crypto/rsa"
 	"encoding/pem"
 	"fmt"
-	"github.com/zitadel/saml/pkg/provider/serviceprovider"
-	"github.com/zitadel/saml/pkg/provider/xml/md"
-	"github.com/zitadel/saml/pkg/provider/xml/samlp"
-	"gopkg.in/square/go-jose.v2"
 	"io"
 	"net/http"
 	"reflect"
 	"text/template"
 	"time"
+
+	"gopkg.in/square/go-jose.v2"
+
+	"github.com/zitadel/saml/pkg/provider/serviceprovider"
+	"github.com/zitadel/saml/pkg/provider/xml/md"
+	"github.com/zitadel/saml/pkg/provider/xml/samlp"
 )
 
 const (
@@ -66,11 +68,7 @@ type IdentityProvider struct {
 	logoutTemplate *template.Template
 
 	metadataEndpoint *Endpoint
-
-	metadata   *md.IDPSSODescriptorType
-	aaMetadata *md.AttributeAuthorityDescriptorType
-
-	endpoints *Endpoints
+	endpoints        *Endpoints
 }
 
 type Endpoints struct {
@@ -227,12 +225,15 @@ func getResponseCert(ctx context.Context, storage IdentityProviderStorage) ([]by
 		return nil, nil, fmt.Errorf("signer has no key")
 	}
 
-	certWebKey := certAndKey.Certificate.Key.(jose.JSONWebKey)
+	certWebKey, ok := certAndKey.Certificate.Key.(jose.JSONWebKey)
+	if !ok {
+		return nil, nil, fmt.Errorf("response certificate not in expected format")
+	}
 	if certWebKey.Key == nil {
 		return nil, nil, fmt.Errorf("certificate is nil")
 	}
 	cert, ok := certWebKey.Key.([]byte)
-	if !ok || cert == nil || len(cert) == 0 {
+	if !ok || cert == nil {
 		return nil, nil, fmt.Errorf("failed to parse certificate")
 	}
 
@@ -254,12 +255,11 @@ func (i *IdentityProvider) certificateHandleFunc(w http.ResponseWriter, r *http.
 		http.Error(w, fmt.Errorf("failed to read certificate: %w", err).Error(), http.StatusInternalServerError)
 		return
 	}
-	fmt.Printf(IssuerFromContext(r.Context()))
 
 	certPem := new(bytes.Buffer)
 	if err := pem.Encode(certPem, &pem.Block{
 		Type:  "CERTIFICATE",
-		Bytes: []byte(cert),
+		Bytes: cert,
 	}); err != nil {
 		http.Error(w, fmt.Errorf("failed to pem encode certificate: %w", err).Error(), http.StatusInternalServerError)
 		return

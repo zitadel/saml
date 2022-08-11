@@ -2,13 +2,15 @@ package provider
 
 import (
 	"context"
-	"github.com/golang/mock/gomock"
-	dsig "github.com/russellhaering/goxmldsig"
-	"github.com/zitadel/saml/pkg/provider/mock"
 	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
 	"testing"
+
+	"github.com/golang/mock/gomock"
+	dsig "github.com/russellhaering/goxmldsig"
+
+	"github.com/zitadel/saml/pkg/provider/mock"
 )
 
 func TestSSO_loginHandleFunc(t *testing.T) {

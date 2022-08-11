@@ -2,7 +2,11 @@ package provider
 
 import (
 	"fmt"
+	"io/ioutil"
+	"net/http"
+
 	"github.com/zitadel/logging"
+
 	"github.com/zitadel/saml/pkg/provider/checker"
 	"github.com/zitadel/saml/pkg/provider/serviceprovider"
 	"github.com/zitadel/saml/pkg/provider/xml"
@@ -11,8 +15,6 @@ import (
 	"github.com/zitadel/saml/pkg/provider/xml/samlp"
 	"github.com/zitadel/saml/pkg/provider/xml/soap"
 	"github.com/zitadel/saml/pkg/provider/xml/xml_dsig"
-	"io/ioutil"
-	"net/http"
 )
 
 func (p *IdentityProvider) attributeQueryHandleFunc(w http.ResponseWriter, r *http.Request) {
@@ -26,7 +28,7 @@ func (p *IdentityProvider) attributeQueryHandleFunc(w http.ResponseWriter, r *ht
 	metadata, _, err := p.GetMetadata(r.Context())
 	if err != nil {
 		err := fmt.Errorf("failed to read idp metadata: %w", err)
-		logging.Log("SAML-i1dsi3j").Error(err)
+		logging.Error(err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
@@ -41,7 +43,6 @@ func (p *IdentityProvider) attributeQueryHandleFunc(w http.ResponseWriter, r *ht
 			attrQueryRequest = string(b)
 			return nil
 		},
-		"SAML-ap2j3n1",
 		func() {
 			http.Error(w, fmt.Errorf("failed to parse body: %w", err).Error(), http.StatusInternalServerError)
 		},
@@ -56,7 +57,6 @@ func (p *IdentityProvider) attributeQueryHandleFunc(w http.ResponseWriter, r *ht
 			}
 			return nil
 		},
-		"SAML-qpoin2a",
 		func() {
 			http.Error(w, fmt.Errorf("failed to decode request: %w", err).Error(), http.StatusInternalServerError)
 		},
@@ -71,7 +71,6 @@ func (p *IdentityProvider) attributeQueryHandleFunc(w http.ResponseWriter, r *ht
 			}
 			return nil
 		},
-		" SAML-asdi1n",
 		func() {
 			http.Error(w, fmt.Errorf("failed to find registered serviceprovider: %w", err).Error(), http.StatusInternalServerError)
 		},
@@ -87,7 +86,6 @@ func (p *IdentityProvider) attributeQueryHandleFunc(w http.ResponseWriter, r *ht
 			func() *xml_dsig.SignatureType { return attrQuery.Signature },
 			func() *md.EntityDescriptorType { return sp.Metadata },
 		),
-		"SAML-bxi3n5",
 		func() {
 			http.Error(w, fmt.Errorf("failed to validate certificate from request: %w", err).Error(), http.StatusInternalServerError)
 		},
@@ -103,7 +101,6 @@ func (p *IdentityProvider) attributeQueryHandleFunc(w http.ResponseWriter, r *ht
 			func() *serviceprovider.ServiceProvider { return sp },
 			func(errF error) { err = errF },
 		),
-		"SAML-ao1n2ps",
 		func() {
 			http.Error(w, fmt.Errorf("failed to extract signature from request: %w", err).Error(), http.StatusInternalServerError)
 		},
@@ -112,7 +109,6 @@ func (p *IdentityProvider) attributeQueryHandleFunc(w http.ResponseWriter, r *ht
 	// verify that destination in request is this IDP
 	checkerInstance.WithLogicStep(
 		func() error { err = verifyRequestDestinationOfAttrQuery(metadata, attrQuery); return err },
-		"SAML-ap2n1a",
 		func() {
 			http.Error(w, fmt.Errorf("failed to verify request destination: %w", err).Error(), http.StatusInternalServerError)
 		},
@@ -135,7 +131,6 @@ func (p *IdentityProvider) attributeQueryHandleFunc(w http.ResponseWriter, r *ht
 			response = makeAttributeQueryResponse(attrQuery.Id, p.GetEntityID(r.Context()), sp.GetEntityID(), attrs, queriedAttrs)
 			return nil
 		},
-		"SAML-wosm22",
 		func() {
 			http.Error(w, fmt.Errorf("failed to get userinfo: %w", err).Error(), http.StatusInternalServerError)
 		},
@@ -146,7 +141,6 @@ func (p *IdentityProvider) attributeQueryHandleFunc(w http.ResponseWriter, r *ht
 		func() error {
 			return createPostSignature(r.Context(), response, p)
 		},
-		"SAML-p012sa",
 		func() {
 			http.Error(w, fmt.Errorf("failed to sign response: %w", err).Error(), http.StatusInternalServerError)
 		},
@@ -164,7 +158,7 @@ func (p *IdentityProvider) attributeQueryHandleFunc(w http.ResponseWriter, r *ht
 	}
 
 	if err := xml.WriteXMLMarshalled(w, soapResponse); err != nil {
-		logging.Log("SAML-91j12bk").Error(err)
+		logging.Error(err)
 		http.Error(w, fmt.Errorf("failed to send response: %w", err).Error(), http.StatusInternalServerError)
 	}
 }

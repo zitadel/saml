@@ -7,10 +7,11 @@ import (
 	"encoding/base64"
 	"encoding/pem"
 	"fmt"
-	"github.com/amdonov/xmlsig"
-	dsig "github.com/russellhaering/goxmldsig"
 	"regexp"
 	"strings"
+
+	"github.com/amdonov/xmlsig"
+	dsig "github.com/russellhaering/goxmldsig"
 )
 
 func ParseCertificates(certStrs []string) ([]*x509.Certificate, error) {
@@ -57,10 +58,8 @@ func GetSigningContextAndSigner(
 	key *rsa.PrivateKey,
 	signatureAlgorithm string,
 ) (*dsig.SigningContext, xmlsig.Signer, error) {
-	if signatureAlgorithm != dsig.RSASHA1SignatureMethod &&
-		signatureAlgorithm != dsig.RSASHA256SignatureMethod &&
-		signatureAlgorithm != dsig.RSASHA512SignatureMethod {
-		return nil, nil, fmt.Errorf("invalid signing method %s", signatureAlgorithm)
+	if err := isValidSignatureAlgorithm(signatureAlgorithm); err != nil {
+		return nil, nil, err
 	}
 
 	tlsCert, err := ParseTlsKeyPair(cert, key)
@@ -89,10 +88,8 @@ func GetSigner(
 	key *rsa.PrivateKey,
 	signatureAlgorithm string,
 ) (xmlsig.Signer, error) {
-	if signatureAlgorithm != dsig.RSASHA1SignatureMethod &&
-		signatureAlgorithm != dsig.RSASHA256SignatureMethod &&
-		signatureAlgorithm != dsig.RSASHA512SignatureMethod {
-		return nil, fmt.Errorf("invalid signing method %s", signatureAlgorithm)
+	if err := isValidSignatureAlgorithm(signatureAlgorithm); err != nil {
+		return nil, err
 	}
 
 	tlsCert, err := ParseTlsKeyPair(cert, key)
@@ -118,4 +115,15 @@ func GetSigningContext(tlsCert tls.Certificate, signatureAlgorithm string) (*dsi
 		return nil, err
 	}
 	return signingContext, nil
+}
+
+func isValidSignatureAlgorithm(alg string) error {
+	switch alg {
+	case dsig.RSASHA1SignatureMethod,
+		dsig.RSASHA256SignatureMethod,
+		dsig.RSASHA512SignatureMethod:
+		return nil
+	default:
+		return fmt.Errorf("invalid signing method %s", alg)
+	}
 }

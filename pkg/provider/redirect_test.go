@@ -1,10 +1,12 @@
 package provider
 
 import (
+	"testing"
+
 	dsig "github.com/russellhaering/goxmldsig"
+
 	"github.com/zitadel/saml/pkg/provider/serviceprovider"
 	"github.com/zitadel/saml/pkg/provider/xml/md"
-	"testing"
 )
 
 func TestRedirect_signatureRedirectVerificationNecessary(t *testing.T) {
