@@ -2,6 +2,7 @@ package provider
 
 import (
 	"context"
+
 	"github.com/zitadel/saml/pkg/provider/key"
 	"github.com/zitadel/saml/pkg/provider/models"
 	"github.com/zitadel/saml/pkg/provider/serviceprovider"
@@ -9,14 +10,14 @@ import (
 )
 
 type EntityStorage interface {
-	GetCA(context.Context, chan<- key.CertificateAndKey)
-	GetMetadataSigningKey(context.Context, chan<- key.CertificateAndKey)
+	GetCA(context.Context) (*key.CertificateAndKey, error)
+	GetMetadataSigningKey(context.Context) (*key.CertificateAndKey, error)
 }
 
 type IdentityProviderStorage interface {
 	GetEntityByID(ctx context.Context, entityID string) (*serviceprovider.ServiceProvider, error)
 	GetEntityIDByAppID(ctx context.Context, entityID string) (string, error)
-	GetResponseSigningKey(context.Context, chan<- key.CertificateAndKey)
+	GetResponseSigningKey(context.Context) (*key.CertificateAndKey, error)
 }
 
 type AuthStorage interface {

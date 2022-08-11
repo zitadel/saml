@@ -2,9 +2,11 @@ package checker_test
 
 import (
 	"fmt"
-	"github.com/stretchr/testify/assert"
-	"github.com/zitadel/saml/pkg/provider/checker"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
+
+	"github.com/zitadel/saml/pkg/provider/checker"
 )
 
 func Test_CheckerEmpty(t *testing.T) {
@@ -48,7 +50,6 @@ func Test_CheckerWithValueNotEmptyCheck(t *testing.T) {
 			checkerInstance.WithValueNotEmptyCheck(
 				"test",
 				func() string { return tt.arg },
-				"test",
 				errorFunc,
 			)
 
@@ -108,7 +109,6 @@ func Test_CheckerWithValuesNotEmptyCheck(t *testing.T) {
 			checkerInstance := &checker.Checker{}
 			checkerInstance.WithValuesNotEmptyCheck(
 				func() []string { return tt.arg },
-				"test",
 				errorFunc,
 			)
 
@@ -206,7 +206,6 @@ func Test_CheckerWithValueLengthCheck(t *testing.T) {
 				func() string { return tt.args.value },
 				tt.args.minlength,
 				tt.args.maxlength,
-				"test",
 				errorFunc,
 			)
 
@@ -267,7 +266,6 @@ func Test_CheckerWithValueEqualsCheck(t *testing.T) {
 				"test",
 				func() string { return tt.args.value },
 				func() string { return tt.args.equals },
-				"test",
 				errorFunc,
 			)
 
@@ -364,7 +362,6 @@ func Test_CheckerWithConditionalValueNotEmpty(t *testing.T) {
 				func() bool { return tt.args.condition },
 				"test",
 				func() string { return tt.args.value },
-				"test",
 				errorFunc,
 			)
 
@@ -400,7 +397,6 @@ func Test_CheckerWithLogicStep(t *testing.T) {
 			checkerInstance := &checker.Checker{}
 			checkerInstance.WithLogicStep(
 				tt.arg,
-				"test",
 				errorFunc,
 			)
 
@@ -463,7 +459,6 @@ func Test_CheckerWithConditionalLogicStep(t *testing.T) {
 			checkerInstance.WithConditionalLogicStep(
 				tt.args.cond,
 				tt.args.f,
-				"test",
 				errorFunc,
 			)
 

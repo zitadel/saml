@@ -2,7 +2,11 @@ package provider
 
 import (
 	"fmt"
+	"net/http"
+	"strconv"
+
 	"github.com/zitadel/logging"
+
 	"github.com/zitadel/saml/pkg/provider/checker"
 	"github.com/zitadel/saml/pkg/provider/models"
 	"github.com/zitadel/saml/pkg/provider/serviceprovider"
@@ -10,8 +14,6 @@ import (
 	"github.com/zitadel/saml/pkg/provider/xml/md"
 	"github.com/zitadel/saml/pkg/provider/xml/samlp"
 	"github.com/zitadel/saml/pkg/provider/xml/xml_dsig"
-	"net/http"
-	"strconv"
 )
 
 type AuthRequestForm struct {
@@ -36,7 +38,15 @@ func (p *IdentityProvider) ssoHandleFunc(w http.ResponseWriter, r *http.Request)
 		ErrorFunc: func(err error) {
 			http.Error(w, fmt.Errorf("failed to send response: %w", err).Error(), http.StatusInternalServerError)
 		},
-		Issuer: p.EntityID,
+		Issuer: p.GetEntityID(r.Context()),
+	}
+
+	metadata, _, err := p.GetMetadata(r.Context())
+	if err != nil {
+		err := fmt.Errorf("failed to read idp metadata: %w", err)
+		logging.Error(err)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
 	}
 
 	// parse form to cover POST and REDIRECT binding
@@ -50,7 +60,6 @@ func (p *IdentityProvider) ssoHandleFunc(w http.ResponseWriter, r *http.Request)
 			response.RelayState = authRequestForm.RelayState
 			return nil
 		},
-		"SAML-837n2s",
 		func() {
 			http.Error(w, fmt.Errorf("failed to parse form: %w", err).Error(), http.StatusInternalServerError)
 		},
@@ -60,7 +69,6 @@ func (p *IdentityProvider) ssoHandleFunc(w http.ResponseWriter, r *http.Request)
 	checkerInstance.WithValueNotEmptyCheck(
 		"relayState",
 		func() string { return authRequestForm.RelayState },
-		"SAML-86272s",
 		func() {
 			response.sendBackResponse(r, w, response.makeDeniedResponse(fmt.Errorf("empty relaystate").Error()))
 		},
@@ -70,7 +78,6 @@ func (p *IdentityProvider) ssoHandleFunc(w http.ResponseWriter, r *http.Request)
 	checkerInstance.WithValueNotEmptyCheck(
 		"SAMLRequest",
 		func() string { return authRequestForm.AuthRequest },
-		"SAML-nu32kq",
 		func() {
 			response.sendBackResponse(r, w, response.makeDeniedResponse(fmt.Errorf("no auth request provided").Error()))
 		},
@@ -81,7 +88,6 @@ func (p *IdentityProvider) ssoHandleFunc(w http.ResponseWriter, r *http.Request)
 		func() bool { return authRequestForm.SigAlg != "" },
 		"Signature",
 		func() string { return authRequestForm.Sig },
-		"SAML-827n2s",
 		func() {
 			response.sendBackResponse(r, w, response.makeDeniedResponse(fmt.Errorf("signature algorith provided but no signature").Error()))
 		},
@@ -97,7 +103,6 @@ func (p *IdentityProvider) ssoHandleFunc(w http.ResponseWriter, r *http.Request)
 			response.RequestID = authNRequest.Id
 			return nil
 		},
-		"SAML-837s2s",
 		func() {
 			response.sendBackResponse(r, w, response.makeDeniedResponse(fmt.Errorf("failed to decode request").Error()))
 		},
@@ -113,7 +118,6 @@ func (p *IdentityProvider) ssoHandleFunc(w http.ResponseWriter, r *http.Request)
 			response.Audience = sp.GetEntityID()
 			return nil
 		},
-		" SAML-317s2s",
 		func() {
 			response.sendBackResponse(r, w, response.makeDeniedResponse(fmt.Errorf("failed to find registered serviceprovider: %w", err).Error()))
 		},
@@ -129,7 +133,6 @@ func (p *IdentityProvider) ssoHandleFunc(w http.ResponseWriter, r *http.Request)
 			func() *xml_dsig.SignatureType { return authNRequest.Signature },
 			func() *md.EntityDescriptorType { return sp.Metadata },
 		),
-		"SAML-b17d9a",
 		func() {
 			response.sendBackResponse(r, w, response.makeDeniedResponse(fmt.Errorf("failed to validate certificate from request: %w", err).Error()))
 		},
@@ -138,7 +141,7 @@ func (p *IdentityProvider) ssoHandleFunc(w http.ResponseWriter, r *http.Request)
 	// verify signature if necessary
 	checkerInstance.WithConditionalLogicStep(
 		signatureRedirectVerificationNecessary(
-			func() *md.IDPSSODescriptorType { return p.Metadata },
+			func() *md.IDPSSODescriptorType { return metadata },
 			func() *md.EntityDescriptorType { return sp.Metadata },
 			func() string { return authRequestForm.Sig },
 			func() string { return authRequestForm.Binding },
@@ -151,7 +154,6 @@ func (p *IdentityProvider) ssoHandleFunc(w http.ResponseWriter, r *http.Request)
 			func() *serviceprovider.ServiceProvider { return sp },
 			func(errF error) { err = errF },
 		),
-		"SAML-817n2s",
 		func() {
 			response.sendBackResponse(r, w, response.makeDeniedResponse(fmt.Errorf("failed to verify signature: %w", err).Error()))
 		},
@@ -160,7 +162,7 @@ func (p *IdentityProvider) ssoHandleFunc(w http.ResponseWriter, r *http.Request)
 	// verify signature if necessary
 	checkerInstance.WithConditionalLogicStep(
 		signaturePostVerificationNecessary(
-			func() *md.IDPSSODescriptorType { return p.Metadata },
+			func() *md.IDPSSODescriptorType { return metadata },
 			func() *md.EntityDescriptorType { return sp.Metadata },
 			func() *xml_dsig.SignatureType { return authNRequest.Signature },
 			func() string { return authRequestForm.Binding },
@@ -170,7 +172,6 @@ func (p *IdentityProvider) ssoHandleFunc(w http.ResponseWriter, r *http.Request)
 			func() *serviceprovider.ServiceProvider { return sp },
 			func(errF error) { err = errF },
 		),
-		"SAML-817n2s",
 		func() {
 			response.sendBackResponse(r, w, response.makeDeniedResponse(fmt.Errorf("failed to verify signature: %w", err).Error()))
 		},
@@ -187,7 +188,6 @@ func (p *IdentityProvider) ssoHandleFunc(w http.ResponseWriter, r *http.Request)
 	checkerInstance.WithValueNotEmptyCheck(
 		"acsUrl",
 		func() string { return response.AcsUrl },
-		"SAML-83712s",
 		func() {
 			response.sendBackResponse(r, w, response.makeUnsupportedBindingResponse(fmt.Errorf("missing usable assertion consumer url").Error()))
 		},
@@ -197,7 +197,6 @@ func (p *IdentityProvider) ssoHandleFunc(w http.ResponseWriter, r *http.Request)
 	checkerInstance.WithValueNotEmptyCheck(
 		"protocol binding",
 		func() string { return response.ProtocolBinding },
-		"SAML-83711s",
 		func() {
 			response.sendBackResponse(r, w, response.makeUnsupportedBindingResponse(fmt.Errorf("missing usable protocol binding").Error()))
 		},
@@ -205,11 +204,10 @@ func (p *IdentityProvider) ssoHandleFunc(w http.ResponseWriter, r *http.Request)
 
 	checkerInstance.WithLogicStep(
 		checkRequestRequiredContent(
-			func() *IdentityProvider { return p },
+			func() *md.IDPSSODescriptorType { return metadata },
 			func() *serviceprovider.ServiceProvider { return sp },
 			func() *samlp.AuthnRequestType { return authNRequest },
 		),
-		"SAML-83722s",
 		func() {
 			response.sendBackResponse(r, w, response.makeDeniedResponse(fmt.Errorf("failed to validate request content: %w", err).Error()))
 		},
@@ -228,7 +226,6 @@ func (p *IdentityProvider) ssoHandleFunc(w http.ResponseWriter, r *http.Request)
 			)
 			return err
 		},
-		"SAML-8opi22s",
 		func() {
 			response.sendBackResponse(r, w, response.makeResponderFailResponse(fmt.Errorf("failed to persist request: %w", err).Error()))
 		},
@@ -243,7 +240,7 @@ func (p *IdentityProvider) ssoHandleFunc(w http.ResponseWriter, r *http.Request)
 	case RedirectBinding, PostBinding:
 		http.Redirect(w, r, sp.LoginURL(authRequest.GetID()), http.StatusSeeOther)
 	default:
-		logging.Log("SAML-67722s").Error(err)
+		logging.Error(err)
 		response.sendBackResponse(r, w, response.makeUnsupportedBindingResponse(fmt.Errorf("unsupported binding: %s", response.ProtocolBinding).Error()))
 	}
 	return
@@ -275,13 +272,13 @@ func getAuthRequestFromRequest(r *http.Request) (*AuthRequestForm, error) {
 }
 
 func checkRequestRequiredContent(
-	idpF func() *IdentityProvider,
+	idpMetadataF func() *md.IDPSSODescriptorType,
 	spF func() *serviceprovider.ServiceProvider,
 	authNRequestF func() *samlp.AuthnRequestType,
 ) func() error {
 	return func() error {
 		sp := spF()
-		idp := idpF()
+		idpMetadata := idpMetadataF()
 		authNRequest := authNRequestF()
 
 		if authNRequest.Conditions != nil &&
@@ -310,7 +307,7 @@ func checkRequestRequiredContent(
 			return fmt.Errorf("issuer in request not equal entityID of service provider")
 		}
 
-		if err := idp.verifyRequestDestinationOfAuthRequest(authNRequest); err != nil {
+		if err := verifyRequestDestinationOfAuthRequest(idpMetadata, authNRequest); err != nil {
 			return err
 		}
 

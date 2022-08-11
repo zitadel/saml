@@ -2,6 +2,7 @@ package soap
 
 import (
 	"encoding/xml"
+
 	"github.com/zitadel/saml/pkg/provider/xml/samlp"
 )
 

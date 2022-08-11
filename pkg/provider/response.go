@@ -3,13 +3,14 @@ package provider
 import (
 	"encoding/base64"
 	"fmt"
-	"github.com/zitadel/saml/pkg/provider/xml"
-	"github.com/zitadel/saml/pkg/provider/xml/saml"
-	"github.com/zitadel/saml/pkg/provider/xml/samlp"
 	"net/http"
 	"net/url"
 	"text/template"
 	"time"
+
+	"github.com/zitadel/saml/pkg/provider/xml"
+	"github.com/zitadel/saml/pkg/provider/xml/saml"
+	"github.com/zitadel/saml/pkg/provider/xml/samlp"
 )
 
 const (

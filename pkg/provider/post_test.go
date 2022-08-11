@@ -1,10 +1,11 @@
 package provider
 
 import (
+	"testing"
+
 	"github.com/zitadel/saml/pkg/provider/serviceprovider"
 	"github.com/zitadel/saml/pkg/provider/xml/md"
 	"github.com/zitadel/saml/pkg/provider/xml/xml_dsig"
-	"testing"
 )
 
 func TestSSO_signaturePostVerificationNecessary(t *testing.T) {

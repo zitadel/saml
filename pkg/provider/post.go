@@ -1,13 +1,15 @@
 package provider
 
 import (
+	"context"
 	"encoding/base64"
+	"reflect"
+
 	"github.com/zitadel/saml/pkg/provider/serviceprovider"
 	"github.com/zitadel/saml/pkg/provider/signature"
 	"github.com/zitadel/saml/pkg/provider/xml/md"
 	"github.com/zitadel/saml/pkg/provider/xml/samlp"
 	"github.com/zitadel/saml/pkg/provider/xml/xml_dsig"
-	"reflect"
 )
 
 func signaturePostProvided(
@@ -61,10 +63,21 @@ func verifyPostSignature(
 }
 
 func createPostSignature(
+	ctx context.Context,
 	samlResponse *samlp.ResponseType,
 	idp *IdentityProvider,
 ) error {
-	sig, err := signature.Create(idp.signer, samlResponse.Assertion)
+	cert, key, err := getResponseCert(ctx, idp.storage)
+	if err != nil {
+		return err
+	}
+
+	signer, err := signature.GetSigner(cert, key, idp.conf.SignatureAlgorithm)
+	if err != nil {
+		return err
+	}
+
+	sig, err := signature.Create(signer, samlResponse.Assertion)
 	if err != nil {
 		return err
 	}

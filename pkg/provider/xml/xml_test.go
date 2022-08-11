@@ -1,8 +1,9 @@
 package xml_test
 
 import (
-	"github.com/zitadel/saml/pkg/provider/xml"
 	"testing"
+
+	"github.com/zitadel/saml/pkg/provider/xml"
 )
 
 type XML struct {

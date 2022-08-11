@@ -2,8 +2,9 @@ package provider
 
 import (
 	"fmt"
-	"github.com/zitadel/logging"
 	"net/http"
+
+	"github.com/zitadel/logging"
 )
 
 func (p *IdentityProvider) callbackHandleFunc(w http.ResponseWriter, r *http.Request) {
@@ -12,12 +13,12 @@ func (p *IdentityProvider) callbackHandleFunc(w http.ResponseWriter, r *http.Req
 		ErrorFunc: func(err error) {
 			http.Error(w, fmt.Errorf("failed to send response: %w", err).Error(), http.StatusInternalServerError)
 		},
-		Issuer: p.EntityID,
+		Issuer: p.GetEntityID(r.Context()),
 	}
 
 	ctx := r.Context()
 	if err := r.ParseForm(); err != nil {
-		logging.Log("SAML-91j1kk").Error(err)
+		logging.Error(err)
 		http.Error(w, fmt.Errorf("failed to parse form: %w", err).Error(), http.StatusInternalServerError)
 		return
 	}
@@ -25,31 +26,31 @@ func (p *IdentityProvider) callbackHandleFunc(w http.ResponseWriter, r *http.Req
 	requestID := r.Form.Get("id")
 	if requestID == "" {
 		err := fmt.Errorf("no requestID provided")
-		logging.Log("SAML-91j1dk").Error(err)
+		logging.Error(err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
 	authRequest, err := p.storage.AuthRequestByID(r.Context(), requestID)
+	if err != nil {
+		logging.Error(err)
+		response.sendBackResponse(r, w, response.makeDeniedResponse(fmt.Errorf("failed to get request: %w", err).Error()))
+		return
+	}
 	response.RequestID = authRequest.GetAuthRequestID()
 	response.RelayState = authRequest.GetRelayState()
 	response.ProtocolBinding = authRequest.GetBindingType()
 	response.AcsUrl = authRequest.GetAccessConsumerServiceURL()
-	if err != nil {
-		logging.Log("SAML-91jp3k").Error(err)
-		response.sendBackResponse(r, w, response.makeDeniedResponse(fmt.Errorf("failed to get request: %w", err).Error()))
-		return
-	}
 
 	if !authRequest.Done() {
-		logging.Log("SAML-91jp2k").Error(err)
+		logging.Error(err)
 		http.Error(w, fmt.Errorf("failed to get entityID: %w", err).Error(), http.StatusInternalServerError)
 		return
 	}
 
 	entityID, err := p.storage.GetEntityIDByAppID(r.Context(), authRequest.GetApplicationID())
 	if err != nil {
-		logging.Log("SAML-91jpdk").Error(err)
+		logging.Error(err)
 		http.Error(w, fmt.Errorf("failed to get entityID: %w", err).Error(), http.StatusInternalServerError)
 		return
 	}
@@ -57,24 +58,23 @@ func (p *IdentityProvider) callbackHandleFunc(w http.ResponseWriter, r *http.Req
 
 	attrs := &Attributes{}
 	if err := p.storage.SetUserinfoWithUserID(ctx, attrs, authRequest.GetUserID(), []int{}); err != nil {
-		logging.Log("SAML-91jplp").Error(err)
+		logging.Error(err)
 		http.Error(w, fmt.Errorf("failed to get userinfo: %w", err).Error(), http.StatusInternalServerError)
 		return
 	}
 
-	//response.SendIP = getIP(r).String()
 	samlResponse := response.makeSuccessfulResponse(attrs)
 
 	switch response.ProtocolBinding {
 	case PostBinding:
-		if err := createPostSignature(samlResponse, p); err != nil {
-			logging.Log("SAML-120dk2").Error(err)
+		if err := createPostSignature(r.Context(), samlResponse, p); err != nil {
+			logging.Error(err)
 			response.sendBackResponse(r, w, response.makeResponderFailResponse(fmt.Errorf("failed to sign response: %w", err).Error()))
 			return
 		}
 	case RedirectBinding:
-		if err := createRedirectSignature(samlResponse, p, response); err != nil {
-			logging.Log("SAML-jwnu2i").Error(err)
+		if err := createRedirectSignature(r.Context(), samlResponse, p, response); err != nil {
+			logging.Error(err)
 			response.sendBackResponse(r, w, response.makeResponderFailResponse(fmt.Errorf("failed to sign response: %w", err).Error()))
 			return
 		}
@@ -83,11 +83,3 @@ func (p *IdentityProvider) callbackHandleFunc(w http.ResponseWriter, r *http.Req
 	response.sendBackResponse(r, w, samlResponse)
 	return
 }
-
-/*
-//TODO
-
-func getIP(request *http.Request) net.IP {
-	return httpapi.RemoteIPFromRequest(request)
-}
-*/

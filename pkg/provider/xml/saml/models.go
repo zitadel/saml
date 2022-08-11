@@ -2,6 +2,7 @@ package saml
 
 import (
 	"encoding/xml"
+
 	"github.com/zitadel/saml/pkg/provider/xml/xenc"
 	"github.com/zitadel/saml/pkg/provider/xml/xml_dsig"
 )

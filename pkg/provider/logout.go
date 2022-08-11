@@ -2,12 +2,14 @@ package provider
 
 import (
 	"fmt"
+	"net/http"
+
 	"github.com/zitadel/logging"
+
 	"github.com/zitadel/saml/pkg/provider/checker"
 	"github.com/zitadel/saml/pkg/provider/serviceprovider"
 	"github.com/zitadel/saml/pkg/provider/xml"
 	"github.com/zitadel/saml/pkg/provider/xml/samlp"
-	"net/http"
 )
 
 type LogoutRequestForm struct {
@@ -28,7 +30,7 @@ func (p *IdentityProvider) logoutHandleFunc(w http.ResponseWriter, r *http.Reque
 		ErrorFunc: func(err error) {
 			http.Error(w, fmt.Errorf("failed to send response: %w", err).Error(), http.StatusInternalServerError)
 		},
-		Issuer: p.EntityID,
+		Issuer: p.GetEntityID(r.Context()),
 	}
 
 	// parse from to get logout request
@@ -41,7 +43,6 @@ func (p *IdentityProvider) logoutHandleFunc(w http.ResponseWriter, r *http.Reque
 			response.RelayState = logoutRequestForm.RelayState
 			return nil
 		},
-		"SAML-91pokk",
 		func() {
 			http.Error(w, fmt.Errorf("failed to parse form: %w", err).Error(), http.StatusInternalServerError)
 		},
@@ -58,7 +59,6 @@ func (p *IdentityProvider) logoutHandleFunc(w http.ResponseWriter, r *http.Reque
 			response.RequestID = logoutRequest.Id
 			return nil
 		},
-		"SAML-892umn",
 		func() {
 			response.sendBackLogoutResponse(w, response.makeUnsupportedlLogoutResponse(fmt.Errorf("failed to decode request: %w", err).Error()))
 		},
@@ -70,7 +70,6 @@ func (p *IdentityProvider) logoutHandleFunc(w http.ResponseWriter, r *http.Reque
 			func() string { return logoutRequest.IssueInstant },
 			func() string { return logoutRequest.NotOnOrAfter },
 		),
-		"SAML-892u3n",
 		func() {
 			response.sendBackLogoutResponse(w, response.makeDeniedLogoutResponse(fmt.Errorf("failed to validate request: %w", err).Error()))
 		},
@@ -82,7 +81,6 @@ func (p *IdentityProvider) logoutHandleFunc(w http.ResponseWriter, r *http.Reque
 			sp, err = p.GetServiceProvider(r.Context(), logoutRequest.Issuer.Text)
 			return err
 		},
-		" SAML-317s2s",
 		func() {
 			response.sendBackLogoutResponse(w, response.makeDeniedLogoutResponse(fmt.Errorf("failed to find registered serviceprovider: %w", err).Error()))
 		},
@@ -109,7 +107,7 @@ func (p *IdentityProvider) logoutHandleFunc(w http.ResponseWriter, r *http.Reque
 		w,
 		response.makeSuccessfulLogoutResponse(),
 	)
-	logging.Log("SAML-892u3n").Info(fmt.Sprintf("logout request for user %s", logoutRequest.NameID.Text))
+	logging.Info(fmt.Sprintf("logout request for user %s", logoutRequest.NameID.Text))
 }
 
 func getLogoutRequestFromRequest(r *http.Request) (*LogoutRequestForm, error) {

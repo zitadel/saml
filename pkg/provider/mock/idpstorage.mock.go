@@ -98,15 +98,18 @@ func (mr *MockIDPStorageMockRecorder) GetEntityIDByAppID(arg0, arg1 interface{})
 }
 
 // GetResponseSigningKey mocks base method
-func (m *MockIDPStorage) GetResponseSigningKey(arg0 context.Context, arg1 chan<- key.CertificateAndKey) {
+func (m *MockIDPStorage) GetResponseSigningKey(arg0 context.Context) (*key.CertificateAndKey, error) {
 	m.ctrl.T.Helper()
-	m.ctrl.Call(m, "GetResponseSigningKey", arg0, arg1)
+	ret := m.ctrl.Call(m, "GetResponseSigningKey", arg0)
+	ret0, _ := ret[0].(*key.CertificateAndKey)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
 }
 
 // GetResponseSigningKey indicates an expected call of GetResponseSigningKey
-func (mr *MockIDPStorageMockRecorder) GetResponseSigningKey(arg0, arg1 interface{}) *gomock.Call {
+func (mr *MockIDPStorageMockRecorder) GetResponseSigningKey(arg0 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetResponseSigningKey", reflect.TypeOf((*MockIDPStorage)(nil).GetResponseSigningKey), arg0, arg1)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetResponseSigningKey", reflect.TypeOf((*MockIDPStorage)(nil).GetResponseSigningKey), arg0)
 }
 
 // Health mocks base method

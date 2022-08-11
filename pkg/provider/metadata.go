@@ -1,24 +1,30 @@
 package provider
 
 import (
+	"context"
 	"encoding/base64"
 	"encoding/xml"
 	"fmt"
+	"net/http"
+	"time"
+
 	"github.com/zitadel/logging"
-	"github.com/zitadel/oidc/pkg/op"
-	"github.com/zitadel/saml/pkg/provider/signature"
+
 	saml_xml "github.com/zitadel/saml/pkg/provider/xml"
 	"github.com/zitadel/saml/pkg/provider/xml/md"
 	"github.com/zitadel/saml/pkg/provider/xml/xenc"
 	"github.com/zitadel/saml/pkg/provider/xml/xml_dsig"
-	"net/http"
+)
+
+const (
+	DefaultValidUntil = 5 * time.Minute
 )
 
 func (p *Provider) metadataHandle(w http.ResponseWriter, r *http.Request) {
-	metadata, err := p.GetMetadata()
+	metadata, err := p.GetMetadata(r.Context())
 	if err != nil {
 		err := fmt.Errorf("error while getting metadata: %w", err)
-		logging.Log("SAML-mp2ok3").Error(err)
+		logging.Error(err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
@@ -30,14 +36,17 @@ func (p *Provider) metadataHandle(w http.ResponseWriter, r *http.Request) {
 }
 
 func (p *IdentityProviderConfig) getMetadata(
-	metadataEndpoint *op.Endpoint,
+	ctx context.Context,
+	entityID string,
 	idpCertData []byte,
 ) (*md.IDPSSODescriptorType, *md.AttributeAuthorityDescriptorType) {
+	endpoints := endpointConfigToEndpoints(p.Endpoints)
+
 	idpKeyDescriptors := []md.KeyDescriptorType{
 		{
 			Use: md.KeyTypesSigning,
 			KeyInfo: xml_dsig.KeyInfoType{
-				KeyName: []string{metadataEndpoint.Absolute("") + " IDP " + string(md.KeyTypesSigning)},
+				KeyName: []string{entityID + " IDP " + string(md.KeyTypesSigning)},
 				X509Data: []xml_dsig.X509DataType{{
 					X509Certificate: base64.StdEncoding.EncodeToString(idpCertData),
 				}},
@@ -49,7 +58,7 @@ func (p *IdentityProviderConfig) getMetadata(
 		idpKeyDescriptors = append(idpKeyDescriptors, md.KeyDescriptorType{
 			Use: md.KeyTypesEncryption,
 			KeyInfo: xml_dsig.KeyInfoType{
-				KeyName: []string{metadataEndpoint.Absolute("") + " IDP " + string(md.KeyTypesEncryption)},
+				KeyName: []string{entityID + " IDP " + string(md.KeyTypesEncryption)},
 				X509Data: []xml_dsig.X509DataType{{
 					X509Certificate: base64.StdEncoding.EncodeToString(idpCertData),
 				}},
@@ -69,22 +78,30 @@ func (p *IdentityProviderConfig) getMetadata(
 			attr.AttributeValue[i] = ""
 		}
 	}
+	validUntil := ""
+	if p.MetadataIDPConfig.ValidUntil != 0 {
+		validUntil = time.Now().Add(p.MetadataIDPConfig.ValidUntil).UTC().Format(defaultTimeLayout)
+	}
+	cacheDuration := ""
+	if p.MetadataIDPConfig.CacheDuration != "" {
+		cacheDuration = p.MetadataIDPConfig.CacheDuration
+	}
 
 	return &md.IDPSSODescriptorType{
 			XMLName:                    xml.Name{},
 			WantAuthnRequestsSigned:    p.WantAuthRequestsSigned,
 			Id:                         NewID(),
-			ValidUntil:                 p.MetadataIDPConfig.ValidUntil,
-			CacheDuration:              p.MetadataIDPConfig.CacheDuration,
+			ValidUntil:                 validUntil,
+			CacheDuration:              cacheDuration,
 			ProtocolSupportEnumeration: "urn:oasis:names:tc:SAML:2.0:protocol",
 			ErrorURL:                   p.MetadataIDPConfig.ErrorURL,
 			SingleSignOnService: []md.EndpointType{
 				{
 					Binding:  RedirectBinding,
-					Location: p.Endpoints.SingleSignOn.URL,
+					Location: endpoints.singleSignOnEndpoint.Absolute(IssuerFromContext(ctx)),
 				}, {
 					Binding:  PostBinding,
-					Location: p.Endpoints.SingleSignOn.URL,
+					Location: endpoints.singleSignOnEndpoint.Absolute(IssuerFromContext(ctx)),
 				},
 			},
 			//TODO definition for more profiles
@@ -92,24 +109,14 @@ func (p *IdentityProviderConfig) getMetadata(
 				"urn:oasis:names:tc:SAML:2.0:profiles:attribute:basic",
 			},
 			Attribute: attrsSaml,
-			ArtifactResolutionService: []md.IndexedEndpointType{{
-				Index:     "0",
-				IsDefault: "true",
-				Binding:   SOAPBinding,
-				Location:  p.Endpoints.Artifact.URL,
-			}},
 			SingleLogoutService: []md.EndpointType{
 				{
-					Binding:  SOAPBinding,
-					Location: p.Endpoints.SLOArtifact.URL,
-				},
-				{
 					Binding:  RedirectBinding,
-					Location: p.Endpoints.SingleLogOut.URL,
+					Location: endpoints.singleLogoutEndpoint.Absolute(IssuerFromContext(ctx)),
 				},
 				{
 					Binding:  PostBinding,
-					Location: p.Endpoints.SingleLogOut.URL,
+					Location: endpoints.singleLogoutEndpoint.Absolute(IssuerFromContext(ctx)),
 				},
 			},
 			NameIDFormat:  []string{"urn:oasis:names:tc:SAML:2.0:nameid-format:persistent"},
@@ -118,22 +125,17 @@ func (p *IdentityProviderConfig) getMetadata(
 
 			Organization:  nil,
 			ContactPerson: nil,
-			/*
-				NameIDMappingService: nil,
-				AssertionIDRequestService: nil,
-				ManageNameIDService: nil,
-			*/
 		},
 		&md.AttributeAuthorityDescriptorType{
 			XMLName:                    xml.Name{},
 			Id:                         NewID(),
-			ValidUntil:                 p.MetadataIDPConfig.ValidUntil,
-			CacheDuration:              p.MetadataIDPConfig.CacheDuration,
+			ValidUntil:                 validUntil,
+			CacheDuration:              cacheDuration,
 			ProtocolSupportEnumeration: "urn:oasis:names:tc:SAML:2.0:protocol",
 			ErrorURL:                   p.MetadataIDPConfig.ErrorURL,
 			AttributeService: []md.EndpointType{{
 				Binding:  "urn:oasis:names:tc:SAML:2.0:bindings:SOAP",
-				Location: p.Endpoints.Attribute.URL,
+				Location: endpoints.attributeEndpoint.Absolute(IssuerFromContext(ctx)),
 			}},
 			NameIDFormat: []string{"urn:oasis:names:tc:SAML:2.0:nameid-format:persistent"},
 			//TODO definition for more profiles
@@ -146,34 +148,30 @@ func (p *IdentityProviderConfig) getMetadata(
 
 			Organization:  nil,
 			ContactPerson: nil,
-
-			/*
-				AssertionIDRequestService: nil,
-			*/
 		}
 }
 
 func (c *Config) getMetadata(
+	ctx context.Context,
 	idp *IdentityProvider,
-) *md.EntityDescriptorType {
+) (*md.EntityDescriptorType, error) {
 
 	entity := &md.EntityDescriptorType{
 		XMLName:       xml.Name{Local: "md"},
-		EntityID:      md.EntityIDType(idp.EntityID),
+		EntityID:      md.EntityIDType(idp.GetEntityID(ctx)),
 		Id:            NewID(),
 		Signature:     nil,
 		Organization:  nil,
 		ContactPerson: nil,
-		/*
-			AuthnAuthorityDescriptor:     nil,
-			PDPDescriptor:         nil,
-			AffiliationDescriptor: nil,
-		*/
 	}
 
 	if c.IDPConfig != nil {
-		entity.IDPSSODescriptor = idp.Metadata
-		entity.AttributeAuthorityDescriptor = idp.AAMetadata
+		idpMetadata, idpAAMetadata, err := idp.GetMetadata(ctx)
+		if err != nil {
+			return nil, err
+		}
+		entity.IDPSSODescriptor = idpMetadata
+		entity.AttributeAuthorityDescriptor = idpAAMetadata
 	}
 
 	if c.Organisation != nil {
@@ -210,15 +208,5 @@ func (c *Config) getMetadata(
 		entity.IDPSSODescriptor.ContactPerson = contactPerson
 	}
 
-	return entity
-}
-
-func (p *Provider) GetMetadata() (*md.EntityDescriptorType, error) {
-	metadata := *p.Metadata
-	idpSig, err := signature.Create(p.signer, metadata)
-	if err != nil {
-		return nil, err
-	}
-	metadata.Signature = idpSig
-	return &metadata, nil
+	return entity, nil
 }

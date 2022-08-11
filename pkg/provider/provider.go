@@ -4,24 +4,22 @@ import (
 	"context"
 	"crypto/rsa"
 	"fmt"
-	"github.com/amdonov/xmlsig"
+	"net/http"
+
 	"github.com/google/uuid"
 	"github.com/gorilla/handlers"
 	"github.com/gorilla/mux"
-	dsig "github.com/russellhaering/goxmldsig"
-	"github.com/zitadel/logging"
-	"github.com/zitadel/oidc/pkg/op"
-	"github.com/zitadel/saml/pkg/provider/key"
+	"gopkg.in/square/go-jose.v2"
+
 	"github.com/zitadel/saml/pkg/provider/signature"
 	"github.com/zitadel/saml/pkg/provider/xml/md"
-	"gopkg.in/square/go-jose.v2"
-	"net/http"
 )
 
 const (
-	PostBinding     = "urn:oasis:names:tc:SAML:2.0:bindings:HTTP-POST"
-	RedirectBinding = "urn:oasis:names:tc:SAML:2.0:bindings:HTTP-Redirect"
-	SOAPBinding     = "urn:oasis:names:tc:SAML:2.0:bindings:SOAP"
+	PostBinding             = "urn:oasis:names:tc:SAML:2.0:bindings:HTTP-POST"
+	RedirectBinding         = "urn:oasis:names:tc:SAML:2.0:bindings:HTTP-Redirect"
+	SOAPBinding             = "urn:oasis:names:tc:SAML:2.0:bindings:SOAP"
+	DefaultMetadataEndpoint = "/metadata"
 )
 
 type Storage interface {
@@ -32,9 +30,17 @@ type Storage interface {
 	Health(context.Context) error
 }
 
+type Config struct {
+	MetadataConfig *MetadataConfig
+	IDPConfig      *IdentityProviderConfig
+	Metadata       *Endpoint `yaml:"Metadata"`
+
+	Organisation  *Organisation
+	ContactPerson *ContactPerson
+}
+
 type MetadataConfig struct {
 	Path               string
-	URL                string
 	SignatureAlgorithm string
 }
 
@@ -59,10 +65,6 @@ type ContactPerson struct {
 	TelephoneNumber string
 }
 
-func NewID() string {
-	return fmt.Sprintf("_%s", uuid.New())
-}
-
 const (
 	healthEndpoint    = "/healthz"
 	readinessEndpoint = "/ready"
@@ -72,40 +74,29 @@ type Provider struct {
 	storage      Storage
 	httpHandler  http.Handler
 	interceptors []HttpInterceptor
-	caCert       string
-	caKey        string
+	insecure     bool
 
-	MetadataEndpoint *op.Endpoint
-	Metadata         *md.EntityDescriptorType
-	signingContext   *dsig.SigningContext
-	signer           xmlsig.Signer
-
-	IdentityProvider *IdentityProvider
-}
-
-type Config struct {
-	MetadataConfig *MetadataConfig
-	IDPConfig      *IdentityProviderConfig
-
-	Organisation  *Organisation
-	ContactPerson *ContactPerson
+	metadataEndpoint  *Endpoint
+	conf              *Config
+	issuerFromRequest IssuerFromRequest
+	identityProvider  *IdentityProvider
 }
 
 func NewProvider(
 	ctx context.Context,
 	storage Storage,
+	path string,
 	conf *Config,
 	providerOpts ...Option,
 ) (*Provider, error) {
-	getCACert(ctx, storage)
-	cert, key := getMetadataCert(ctx, storage)
-	signingContext, signer, err := signature.GetSigningContextAndSigner(cert, key, conf.MetadataConfig.SignatureAlgorithm)
-
-	metadata := op.NewEndpointWithURL(conf.MetadataConfig.Path, conf.MetadataConfig.URL)
+	metadataEndpoint := NewEndpoint(DefaultMetadataEndpoint)
+	if conf.Metadata != nil {
+		metadataEndpoint = *conf.Metadata
+	}
 
 	idp, err := NewIdentityProvider(
 		ctx,
-		&metadata,
+		metadataEndpoint,
 		conf.IDPConfig,
 		storage,
 	)
@@ -114,12 +105,10 @@ func NewProvider(
 	}
 
 	prov := &Provider{
-		MetadataEndpoint: &metadata,
-		Metadata:         conf.getMetadata(idp),
-		signingContext:   signingContext,
-		signer:           signer,
+		metadataEndpoint: &metadataEndpoint,
 		storage:          storage,
-		IdentityProvider: idp,
+		conf:             conf,
+		identityProvider: idp,
 	}
 
 	for _, optFunc := range providerOpts {
@@ -127,9 +116,24 @@ func NewProvider(
 			return nil, err
 		}
 	}
+
+	issuerFromRequest, err := IssuerFromHost(path)(prov.insecure)
+	if err != nil {
+		return nil, err
+	}
+	prov.issuerFromRequest = issuerFromRequest
+
 	prov.httpHandler = CreateRouter(prov, prov.interceptors...)
 
 	return prov, nil
+}
+
+func NewID() string {
+	return fmt.Sprintf("_%s", uuid.New())
+}
+
+func (p *Provider) IssuerFromRequest(r *http.Request) string {
+	return p.issuerFromRequest(r)
 }
 
 type Option func(o *Provider) error
@@ -145,77 +149,74 @@ func (p *Provider) HttpHandler() http.Handler {
 	return p.httpHandler
 }
 
-func (p *Provider) Storage() Storage {
-	return p.storage
-}
-
 func (p *Provider) Health(ctx context.Context) error {
-	return p.Storage().Health(ctx)
+	return p.storage.Health(ctx)
 }
 
 func (p *Provider) Probes() []ProbesFn {
 	return []ProbesFn{
-		ReadyStorage(p.Storage()),
-	}
-}
-func getCACert(ctx context.Context, storage Storage) ([]byte, *rsa.PrivateKey) {
-	certAndKeyCh := make(chan key.CertificateAndKey)
-	go storage.GetCA(ctx, certAndKeyCh)
-	for {
-		select {
-		case <-ctx.Done():
-			//TODO
-		case certAndKey := <-certAndKeyCh:
-			if certAndKey.Key.Key == nil || certAndKey.Certificate.Key == nil {
-				logging.Log("OP-DAvt4").Warn("signer has no key")
-				continue
-			}
-			certWebKey := certAndKey.Certificate.Key.(jose.JSONWebKey)
-			keyWebKey := certAndKey.Key.Key.(jose.JSONWebKey)
-
-			return certWebKey.Key.([]byte), keyWebKey.Key.(*rsa.PrivateKey)
-		}
+		ReadyStorage(p.storage),
 	}
 }
 
-func getMetadataCert(ctx context.Context, storage Storage) ([]byte, *rsa.PrivateKey) {
-	certAndKeyCh := make(chan key.CertificateAndKey)
-	go storage.GetMetadataSigningKey(ctx, certAndKeyCh)
-
-	for {
-		select {
-		case <-ctx.Done():
-			//TODO
-		case certAndKey := <-certAndKeyCh:
-			if certAndKey.Key.Key == nil || certAndKey.Certificate.Key == nil {
-				logging.Log("OP-DAvt4").Warn("signer has no key")
-				continue
-			}
-			certWebKey := certAndKey.Certificate.Key.(jose.JSONWebKey)
-			keyWebKey := certAndKey.Key.Key.(jose.JSONWebKey)
-
-			return certWebKey.Key.([]byte), keyWebKey.Key.(*rsa.PrivateKey)
-		}
+func (p *Provider) GetMetadata(ctx context.Context) (*md.EntityDescriptorType, error) {
+	metadata, err := p.conf.getMetadata(ctx, p.identityProvider)
+	if err != nil {
+		return nil, err
 	}
+
+	cert, key, err := getMetadataCert(ctx, p.storage)
+	if p.conf.MetadataConfig != nil && p.conf.MetadataConfig.SignatureAlgorithm != "" {
+		signer, err := signature.GetSigner(cert, key, p.conf.MetadataConfig.SignatureAlgorithm)
+		if err != nil {
+			return nil, err
+		}
+
+		idpSig, err := signature.Create(signer, metadata)
+		if err != nil {
+			return nil, err
+		}
+		metadata.Signature = idpSig
+
+	}
+	return metadata, nil
+}
+
+func getMetadataCert(ctx context.Context, storage EntityStorage) ([]byte, *rsa.PrivateKey, error) {
+	certAndKey, err := storage.GetMetadataSigningKey(ctx)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	if certAndKey.Key.Key == nil || certAndKey.Certificate.Key == nil {
+		return nil, nil, fmt.Errorf("signer has no key")
+	}
+
+	certWebKey, ok := certAndKey.Certificate.Key.(jose.JSONWebKey)
+	if !ok {
+		return nil, nil, fmt.Errorf("metadata certificate not in expected format")
+	}
+	keyWebKey, ok := certAndKey.Key.Key.(jose.JSONWebKey)
+	if !ok {
+		return nil, nil, fmt.Errorf("metadata certificate key not in expected format")
+	}
+
+	return certWebKey.Key.([]byte), keyWebKey.Key.(*rsa.PrivateKey), nil
 }
 
 type HttpInterceptor func(http.Handler) http.Handler
 
 func CreateRouter(p *Provider, interceptors ...HttpInterceptor) *mux.Router {
-	intercept := buildInterceptor(interceptors...)
 	router := mux.NewRouter()
-	router.Use(handlers.CORS(
-		handlers.AllowCredentials(),
-		handlers.AllowedHeaders([]string{"authorization", "content-type"}),
-		handlers.AllowedOriginValidator(allowAllOrigins),
-	))
+
+	router.Use(intercept(p.issuerFromRequest, interceptors...))
 	router.HandleFunc(healthEndpoint, healthHandler)
 	router.HandleFunc(readinessEndpoint, readyHandler(p.Probes()))
-	router.HandleFunc(p.MetadataEndpoint.Relative(), p.metadataHandle)
+	router.HandleFunc(p.metadataEndpoint.Relative(), p.metadataHandle)
 
-	if p.IdentityProvider != nil {
-		for _, route := range p.IdentityProvider.GetRoutes() {
-			router.Handle(route.Endpoint, intercept(route.HandleFunc))
+	if p.identityProvider != nil {
+		for _, route := range p.identityProvider.GetRoutes() {
+			router.Handle(route.Endpoint, route.HandleFunc)
 		}
 	}
 	return router
@@ -225,18 +226,33 @@ var allowAllOrigins = func(_ string) bool {
 	return true
 }
 
-func buildInterceptor(interceptors ...HttpInterceptor) func(http.HandlerFunc) http.Handler {
-	return func(handlerFunc http.HandlerFunc) http.Handler {
-		handler := handlerFuncToHandler(handlerFunc)
-		for i := len(interceptors) - 1; i >= 0; i-- {
-			handler = interceptors[i](handler)
-		}
-		return handler
+//AuthCallbackURL builds the url for the redirect (with the requestID) after a successful login
+func AuthCallbackURL(p *Provider) func(context.Context, string) string {
+	return func(ctx context.Context, requestID string) string {
+		return p.identityProvider.endpoints.callbackEndpoint.Absolute(IssuerFromContext(ctx)) + "?id=" + requestID
 	}
 }
 
-func handlerFuncToHandler(handlerFunc http.HandlerFunc) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		handlerFunc(w, r)
-	})
+func intercept(i IssuerFromRequest, interceptors ...HttpInterceptor) func(handler http.Handler) http.Handler {
+	cors := handlers.CORS(
+		handlers.AllowCredentials(),
+		handlers.AllowedHeaders([]string{"authorization", "content-type"}),
+		handlers.AllowedOriginValidator(allowAllOrigins),
+	)
+	issuerInterceptor := NewIssuerInterceptor(i)
+	return func(handler http.Handler) http.Handler {
+		for i := len(interceptors) - 1; i >= 0; i-- {
+			handler = interceptors[i](handler)
+		}
+		return cors(issuerInterceptor.Handler(handler))
+	}
+}
+
+//WithAllowInsecure allows the use of http (instead of https) for issuers
+//this is not recommended for production use and violates the SAML specification
+func WithAllowInsecure() Option {
+	return func(p *Provider) error {
+		p.insecure = true
+		return nil
+	}
 }

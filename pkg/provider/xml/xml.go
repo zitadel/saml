@@ -7,11 +7,12 @@ import (
 	"encoding/base64"
 	"encoding/xml"
 	"fmt"
+	"net/http"
+	"strings"
+
 	"github.com/zitadel/saml/pkg/provider/xml/samlp"
 	"github.com/zitadel/saml/pkg/provider/xml/soap"
 	"github.com/zitadel/saml/pkg/provider/xml/xml_dsig"
-	"net/http"
-	"strings"
 )
 
 const (
@@ -80,12 +81,7 @@ func WriteXMLMarshalled(w http.ResponseWriter, body interface{}) error {
 }
 
 func Write(w http.ResponseWriter, body []byte) error {
-	_, err := w.Write([]byte(xml.Header))
-	if err != nil {
-		return err
-	}
-
-	_, err = w.Write(body)
+	_, err := w.Write(body)
 	return err
 }
 
@@ -118,10 +114,6 @@ func DecodeAuthNRequest(encoding string, message string) (*samlp.AuthnRequestTyp
 
 func DecodeSignature(encoding string, message string) (*xml_dsig.SignatureType, error) {
 	retBytes := []byte(message)
-	/*retBytes, err := base64.StdEncoding.DecodeString(message)
-	if err != nil {
-		return nil, fmt.Errorf("failed to base64 decode: %w", err)
-	}*/
 
 	ret := &xml_dsig.SignatureType{}
 	switch encoding {
@@ -173,6 +165,28 @@ func DecodeLogoutRequest(encoding string, message string) (*samlp.LogoutRequestT
 		reader := flate.NewReader(bytes.NewReader(reqBytes))
 		decoder := xml.NewDecoder(reader)
 		if err = decoder.Decode(req); err != nil {
+			return nil, err
+		}
+	default:
+		return nil, fmt.Errorf("unknown encoding")
+	}
+
+	return req, nil
+}
+
+func DecodeResponse(encoding string, message string) (*samlp.ResponseType, error) {
+
+	req := &samlp.ResponseType{}
+	switch encoding {
+	case "":
+		decoder := xml.NewDecoder(bytes.NewReader([]byte(message)))
+		if err := decoder.Decode(req); err != nil {
+			return nil, err
+		}
+	case EncodingDeflate:
+		reader := flate.NewReader(bytes.NewReader([]byte(message)))
+		decoder := xml.NewDecoder(reader)
+		if err := decoder.Decode(req); err != nil {
 			return nil, err
 		}
 	default:
