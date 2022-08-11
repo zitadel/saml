@@ -11,7 +11,7 @@ require (
 	github.com/gorilla/mux v1.8.0
 	github.com/russellhaering/goxmldsig v1.2.0
 	github.com/stretchr/testify v1.7.1
-	github.com/zitadel/logging v0.3.3
+	github.com/zitadel/logging v0.3.4
 	gopkg.in/square/go-jose.v2 v2.6.0
 )
 
