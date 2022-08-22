@@ -13,8 +13,8 @@ import (
 	"github.com/zitadel/saml/pkg/provider/xml/md"
 )
 
-type ServiceProviderConfig struct {
-	Metadata string
+type Config struct {
+	Metadata []byte
 	URL      string
 }
 
@@ -34,7 +34,7 @@ func (sp *ServiceProvider) LoginURL(id string) string {
 	return sp.defaultLoginURL + id
 }
 
-func NewServiceProvider(id string, config *ServiceProviderConfig, defaultLoginURL string) (*ServiceProvider, error) {
+func NewServiceProvider(id string, config *Config, defaultLoginURL string) (*ServiceProvider, error) {
 	metadataData := make([]byte, 0)
 	if config.URL != "" {
 		body, err := xml.ReadMetadataFromURL(config.URL)
@@ -43,7 +43,7 @@ func NewServiceProvider(id string, config *ServiceProviderConfig, defaultLoginUR
 		}
 		metadataData = body
 	} else {
-		metadataData = []byte(config.Metadata)
+		metadataData = config.Metadata
 	}
 	metadata, err := xml.ParseMetadataXmlIntoStruct(metadataData)
 	if err != nil {

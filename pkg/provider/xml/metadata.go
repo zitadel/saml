@@ -1,7 +1,6 @@
 package xml
 
 import (
-	"encoding/base64"
 	"encoding/xml"
 	"fmt"
 	"io"
@@ -21,24 +20,12 @@ func ReadMetadataFromURL(url string) ([]byte, error) {
 		return nil, fmt.Errorf("error while reading metadata with statusCode: %d", resp.StatusCode)
 	}
 
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, err
-	}
-
-	bodyEncoded := base64.StdEncoding.EncodeToString(body)
-	return []byte(bodyEncoded), nil
+	return io.ReadAll(resp.Body)
 }
 
 func ParseMetadataXmlIntoStruct(xmlData []byte) (*md.EntityDescriptorType, error) {
-	xmlDataDecoded := make([]byte, 0)
-	xmlDataDecoded, err := base64.StdEncoding.DecodeString(string(xmlData))
-	if err != nil {
-		return nil, err
-	}
-
 	metadata := &md.EntityDescriptorType{}
-	if err := xml.Unmarshal(xmlDataDecoded, metadata); err != nil {
+	if err := xml.Unmarshal(xmlData, metadata); err != nil {
 		return nil, err
 	}
 	return metadata, nil
