@@ -4,6 +4,7 @@ import (
 	"crypto/x509"
 	"encoding/base64"
 	"fmt"
+	"net/http"
 	"net/url"
 
 	"github.com/beevik/etree"
@@ -34,10 +35,10 @@ func (sp *ServiceProvider) LoginURL(id string) string {
 	return sp.defaultLoginURL + id
 }
 
-func NewServiceProvider(id string, config *Config, defaultLoginURL string) (*ServiceProvider, error) {
+func NewServiceProvider(client *http.Client, id string, config *Config, defaultLoginURL string) (*ServiceProvider, error) {
 	metadataData := make([]byte, 0)
 	if config.URL != "" {
-		body, err := xml.ReadMetadataFromURL(config.URL)
+		body, err := xml.ReadMetadataFromURL(client, config.URL)
 		if err != nil {
 			return nil, err
 		}

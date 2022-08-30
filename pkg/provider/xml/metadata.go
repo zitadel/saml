@@ -9,8 +9,8 @@ import (
 	"github.com/zitadel/saml/pkg/provider/xml/md"
 )
 
-func ReadMetadataFromURL(url string) ([]byte, error) {
-	resp, err := http.Get(url)
+func ReadMetadataFromURL(client *http.Client, url string) ([]byte, error) {
+	resp, err := client.Get(url)
 	if err != nil {
 		return nil, err
 	}
