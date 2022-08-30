@@ -4,7 +4,6 @@ import (
 	"crypto/x509"
 	"encoding/base64"
 	"fmt"
-	"net/http"
 	"net/url"
 
 	"github.com/beevik/etree"
@@ -16,13 +15,11 @@ import (
 
 type Config struct {
 	Metadata []byte
-	URL      string
 }
 
 type ServiceProvider struct {
 	ID              string
 	Metadata        *md.EntityDescriptorType
-	url             string
 	signerPublicKey interface{}
 	defaultLoginURL string
 }
@@ -35,18 +32,8 @@ func (sp *ServiceProvider) LoginURL(id string) string {
 	return sp.defaultLoginURL + id
 }
 
-func NewServiceProvider(client *http.Client, id string, config *Config, defaultLoginURL string) (*ServiceProvider, error) {
-	metadataData := make([]byte, 0)
-	if config.URL != "" {
-		body, err := xml.ReadMetadataFromURL(client, config.URL)
-		if err != nil {
-			return nil, err
-		}
-		metadataData = body
-	} else {
-		metadataData = config.Metadata
-	}
-	metadata, err := xml.ParseMetadataXmlIntoStruct(metadataData)
+func NewServiceProvider(id string, config *Config, defaultLoginURL string) (*ServiceProvider, error) {
+	metadata, err := xml.ParseMetadataXmlIntoStruct(config.Metadata)
 	if err != nil {
 		return nil, err
 	}
@@ -66,7 +53,6 @@ func NewServiceProvider(client *http.Client, id string, config *Config, defaultL
 	return &ServiceProvider{
 		ID:              id,
 		Metadata:        metadata,
-		url:             config.URL,
 		signerPublicKey: signerPublicKey,
 		defaultLoginURL: defaultLoginURL,
 	}, nil
