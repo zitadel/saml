@@ -15,13 +15,11 @@ import (
 
 type Config struct {
 	Metadata []byte
-	URL      string
 }
 
 type ServiceProvider struct {
 	ID              string
 	Metadata        *md.EntityDescriptorType
-	url             string
 	signerPublicKey interface{}
 	defaultLoginURL string
 }
@@ -35,17 +33,7 @@ func (sp *ServiceProvider) LoginURL(id string) string {
 }
 
 func NewServiceProvider(id string, config *Config, defaultLoginURL string) (*ServiceProvider, error) {
-	metadataData := make([]byte, 0)
-	if config.URL != "" {
-		body, err := xml.ReadMetadataFromURL(config.URL)
-		if err != nil {
-			return nil, err
-		}
-		metadataData = body
-	} else {
-		metadataData = config.Metadata
-	}
-	metadata, err := xml.ParseMetadataXmlIntoStruct(metadataData)
+	metadata, err := xml.ParseMetadataXmlIntoStruct(config.Metadata)
 	if err != nil {
 		return nil, err
 	}
@@ -65,7 +53,6 @@ func NewServiceProvider(id string, config *Config, defaultLoginURL string) (*Ser
 	return &ServiceProvider{
 		ID:              id,
 		Metadata:        metadata,
-		url:             config.URL,
 		signerPublicKey: signerPublicKey,
 		defaultLoginURL: defaultLoginURL,
 	}, nil
