@@ -15,7 +15,6 @@ import (
 
 	"github.com/golang/mock/gomock"
 	dsig "github.com/russellhaering/goxmldsig"
-	"gopkg.in/square/go-jose.v2"
 )
 
 func TestIDP_certificateHandleFunc(t *testing.T) {
@@ -217,12 +216,7 @@ func idpStorageWithResponseCert(t *testing.T, cert []byte, pKey []byte) *mock.Mo
 			}
 			certBytes = blockCert.Bytes
 		}
-		if certAndKey.Certificate == nil {
-			certAndKey.Certificate = &jose.SigningKey{}
-		}
-		certAndKey.Certificate.Key = jose.JSONWebKey{
-			Key: certBytes,
-		}
+		certAndKey.Certificate = certBytes
 	}
 
 	if pKey != nil {
@@ -237,14 +231,7 @@ func idpStorageWithResponseCert(t *testing.T, cert []byte, pKey []byte) *mock.Mo
 			}
 			priv = privT.(*rsa.PrivateKey)
 		}
-
-		if certAndKey.Key == nil {
-			certAndKey.Key = &jose.SigningKey{}
-		}
-
-		certAndKey.Key.Key = jose.JSONWebKey{
-			Key: priv,
-		}
+		certAndKey.Key = priv
 	}
 
 	mockStorage.EXPECT().GetResponseSigningKey(gomock.Any()).Return(certAndKey, nil).MinTimes(0).MaxTimes(1)

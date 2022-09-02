@@ -9,7 +9,6 @@ import (
 	"github.com/google/uuid"
 	"github.com/gorilla/handlers"
 	"github.com/gorilla/mux"
-	"gopkg.in/square/go-jose.v2"
 
 	"github.com/zitadel/saml/pkg/provider/signature"
 	"github.com/zitadel/saml/pkg/provider/xml/md"
@@ -188,20 +187,11 @@ func getMetadataCert(ctx context.Context, storage EntityStorage) ([]byte, *rsa.P
 		return nil, nil, err
 	}
 
-	if certAndKey.Key.Key == nil || certAndKey.Certificate.Key == nil {
+	if certAndKey.Key == nil || certAndKey.Certificate == nil {
 		return nil, nil, fmt.Errorf("signer has no key")
 	}
 
-	certWebKey, ok := certAndKey.Certificate.Key.(jose.JSONWebKey)
-	if !ok {
-		return nil, nil, fmt.Errorf("metadata certificate not in expected format")
-	}
-	keyWebKey, ok := certAndKey.Key.Key.(jose.JSONWebKey)
-	if !ok {
-		return nil, nil, fmt.Errorf("metadata certificate key not in expected format")
-	}
-
-	return certWebKey.Key.([]byte), keyWebKey.Key.(*rsa.PrivateKey), nil
+	return certAndKey.Certificate, certAndKey.Key, nil
 }
 
 type HttpInterceptor func(http.Handler) http.Handler
@@ -226,7 +216,7 @@ var allowAllOrigins = func(_ string) bool {
 	return true
 }
 
-//AuthCallbackURL builds the url for the redirect (with the requestID) after a successful login
+// AuthCallbackURL builds the url for the redirect (with the requestID) after a successful login
 func AuthCallbackURL(p *Provider) func(context.Context, string) string {
 	return func(ctx context.Context, requestID string) string {
 		return p.identityProvider.endpoints.callbackEndpoint.Absolute(IssuerFromContext(ctx)) + "?id=" + requestID
@@ -248,8 +238,8 @@ func intercept(i IssuerFromRequest, interceptors ...HttpInterceptor) func(handle
 	}
 }
 
-//WithAllowInsecure allows the use of http (instead of https) for issuers
-//this is not recommended for production use and violates the SAML specification
+// WithAllowInsecure allows the use of http (instead of https) for issuers
+// this is not recommended for production use and violates the SAML specification
 func WithAllowInsecure() Option {
 	return func(p *Provider) error {
 		p.insecure = true
