@@ -12,8 +12,6 @@ import (
 	"text/template"
 	"time"
 
-	"gopkg.in/square/go-jose.v2"
-
 	"github.com/zitadel/saml/pkg/provider/serviceprovider"
 	"github.com/zitadel/saml/pkg/provider/xml/md"
 	"github.com/zitadel/saml/pkg/provider/xml/samlp"
@@ -216,33 +214,20 @@ func getResponseCert(ctx context.Context, storage IdentityProviderStorage) ([]by
 	}
 
 	if certAndKey == nil ||
-		certAndKey.Key == nil || certAndKey.Key.Key == nil ||
-		certAndKey.Certificate == nil || certAndKey.Certificate.Key == nil {
+		certAndKey.Key == nil ||
+		certAndKey.Certificate == nil {
 		return nil, nil, fmt.Errorf("signer has no key")
 	}
 
-	certWebKey, ok := certAndKey.Certificate.Key.(jose.JSONWebKey)
-	if !ok {
-		return nil, nil, fmt.Errorf("response certificate not in expected format")
-	}
-	if certWebKey.Key == nil {
-		return nil, nil, fmt.Errorf("certificate is nil")
-	}
-	cert, ok := certWebKey.Key.([]byte)
-	if !ok || len(cert) == 0 {
+	if len(certAndKey.Certificate) == 0 {
 		return nil, nil, fmt.Errorf("failed to parse certificate")
 	}
 
-	keyWebKey := certAndKey.Key.Key.(jose.JSONWebKey)
-	if keyWebKey.Key == nil {
-		return nil, nil, fmt.Errorf("key is nil")
-	}
-	key, ok := keyWebKey.Key.(*rsa.PrivateKey)
-	if !ok || key == nil || reflect.DeepEqual(key, rsa.PrivateKey{}) {
+	if certAndKey.Key == nil || reflect.DeepEqual(certAndKey.Key, rsa.PrivateKey{}) {
 		return nil, nil, fmt.Errorf("failed to parse key")
 	}
 
-	return cert, key, nil
+	return certAndKey.Certificate, certAndKey.Key, nil
 }
 
 func (i *IdentityProvider) certificateHandleFunc(w http.ResponseWriter, r *http.Request) {

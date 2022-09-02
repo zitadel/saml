@@ -1,8 +1,10 @@
 package key
 
-import "gopkg.in/square/go-jose.v2"
+import (
+	"crypto/rsa"
+)
 
 type CertificateAndKey struct {
-	Certificate *jose.SigningKey
-	Key         *jose.SigningKey
+	Certificate []byte
+	Key         *rsa.PrivateKey
 }
