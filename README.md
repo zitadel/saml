@@ -9,10 +9,7 @@
 
 ## What is it
 
-This project is a server implementation for the "SAML" (Security Assertion Markup Language) standard written for `Go`.
-
-For signing and signature verification other already existing implementations like `github.com/russellhaering/goxmldsig`
-and `github.com/amdonov/xmlsig`.
+This project is a server implementation for the Security Assertion Markup Language (SAML) standard written for `Go`.
 
 ## Basic Overview
 
@@ -28,9 +25,20 @@ The most important packages of the library:
 
 ## Features
 
-|                   | POST-binding | Redirect-binding | Artifact-binding | Request signing | Response signing | Metadata signing | Response encryption | Assertion Query/Request | Attribute Query | NameID Mapping |
-|-------------------|--------------|------------------|------------------|-----------------|------------------|---------|--------------------|-------------------------|-----------------|----------------|
-| Identity provider | yes          | yes              | no               | yes             | yes              | yes              | no                | no                      | yes             | no             |
+Supported SAML features:
+
+| Feature | Identity provider |
+| --- | --- | 
+| POST-binding | yes |
+| Redirect-binding | yes |
+| Artifact-binding | [no](https://github.com/zitadel/zitadel/issues/3089) |
+| Request signing | yes |
+| Response signing | yes |
+| Metadata signing | yes |
+| Response encryption | [no](https://github.com/zitadel/zitadel/issues/3090) |
+| Assertion Query/Request | no |
+| Attribute Query | yes |
+| NameID Mapping | no |
 
 ## Resources
 
@@ -47,7 +55,8 @@ For your convenience you can find the relevant standards linked below.
 
 ## Supported Go Versions
 
-For security reasons, we only support and recommend the use of one of the latest two Go versions (:white_check_mark:).  
+For security reasons, we only support and recommend the use of one of the latest three Go versions (:white_check_mark:)
+.  
 Versions that also build are marked with :warning:.
 
 | Version | Supported          |
@@ -61,13 +70,35 @@ Versions that also build are marked with :warning:.
 
 ## Why another library
 
-As of 2021 there are not a lot of `SAML` library's in `Go` which can handle server and client implementations. CAOS is
-strongly committed to the general field of IAM (Identity and Access Management) and as such, we need solid frameworks to
-implement services.
+As of 2021 there are only few `SAML` libraries, written in `Go`, which handle server and client implementations. As
+maintainer of [github.com/zitadel/zitadel](https://github.com/zitadel/zitadel) we are strongly committed to the general
+field of IAM (Identity and Access Management) and as such, we need solid frameworks to implement services.
 
-There are some implementations around not specificly after the standard, so the library has to have the possibility to
-provide the functionality to
-still include the outliers.
+The existing libraries that we evaluated were not implementing the standard strictly. For that reason we developed this
+project to be compliant to the standard, while still having the possibility to handle outliers.
+
+For signing and signature verification other already existing implementations
+like `github.com/russellhaering/goxmldsig`(for POST-binding)
+and `github.com/amdonov/xmlsig`(for redirect-binding).
+
+## Other SAML libraries
+
+[https://github.com/crewjam/saml](https://github.com/crewjam/saml)
+
+Supports both IDP and SP side, whereas the IDP side is by their own definition only rudimentary.
+
+[https://github.com/russellhaering/gosaml2](https://github.com/russellhaering/gosaml2)
+
+Implementation of SP side with no IDP side, works with a lot of identity providers, also has an implementation of the
+XML signing which is used in this library.
+
+[https://github.com/RobotsAndPencils/go-saml](https://github.com/RobotsAndPencils/go-saml)
+
+Only SP side, developed for several specific integrations with different IDPs, not an implementation for general SAML.
+
+[https://github.com/amdonov/lite-idp](https://github.com/amdonov/lite-idp)
+
+Basic implementation of IDP side more as a standalone service, not that good to integrate into existing product.
 
 ## License
 
