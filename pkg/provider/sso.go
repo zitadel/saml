@@ -66,7 +66,8 @@ func (p *IdentityProvider) ssoHandleFunc(w http.ResponseWriter, r *http.Request)
 	)
 
 	// verify that relayState is provided
-	checkerInstance.WithValueNotEmptyCheck(
+	checkerInstance.WithConditionalValueNotEmpty(
+		func() bool { return authRequestForm.Binding == RedirectBinding },
 		"relayState",
 		func() string { return authRequestForm.RelayState },
 		func() {
