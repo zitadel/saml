@@ -555,7 +555,7 @@ func newCertAndKey(
 
 	cert := &x509.Certificate{
 		Subject: pkix.Name{
-			Organization: []string{"caos AG"},
+			Organization: []string{"ZITADEL"},
 			CommonName:   "test",
 		},
 		SerialNumber: big.NewInt(int64(rand.Intn(50000))),
@@ -605,8 +605,8 @@ func newCACertAndKey() (
 
 	ca := &x509.Certificate{
 		Subject: pkix.Name{
-			Organization: []string{"caos AG"},
-			CommonName:   "Zitadel SAML CA",
+			Organization: []string{"ZITADEL"},
+			CommonName:   "ZITADEL SAML CA",
 		},
 		IsCA:                  true,
 		BasicConstraintsValid: true,
