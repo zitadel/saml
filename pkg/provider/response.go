@@ -4,7 +4,6 @@ import (
 	"encoding/base64"
 	"fmt"
 	"net/http"
-	"net/url"
 	"text/template"
 	"time"
 
@@ -55,7 +54,7 @@ func (r *Response) doResponse(request *http.Request, w http.ResponseWriter, resp
 		respData := base64.StdEncoding.EncodeToString([]byte(response))
 
 		data := AuthResponseForm{
-			url.QueryEscape(r.RelayState),
+			r.RelayState,
 			respData,
 			r.AcsUrl,
 		}

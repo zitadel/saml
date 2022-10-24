@@ -6,7 +6,6 @@ import (
 	"encoding/base64"
 	"encoding/xml"
 	"net/http"
-	"net/url"
 	"text/template"
 	"time"
 
@@ -57,7 +56,7 @@ func (r *LogoutResponse) sendBackLogoutResponse(w http.ResponseWriter, resp *sam
 	samlMessage := base64.StdEncoding.EncodeToString(xmlbuff.Bytes())
 
 	data := LogoutResponseForm{
-		RelayState:   url.QueryEscape(r.RelayState),
+		RelayState:   r.RelayState,
 		SAMLResponse: samlMessage,
 		LogoutURL:    r.LogoutURL,
 	}
