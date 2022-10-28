@@ -4,7 +4,7 @@ import (
 	"encoding/base64"
 	"fmt"
 	"net/http"
-	"text/template"
+	"html/template"
 	"time"
 
 	"github.com/zitadel/saml/pkg/provider/xml"

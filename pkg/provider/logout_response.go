@@ -6,7 +6,7 @@ import (
 	"encoding/base64"
 	"encoding/xml"
 	"net/http"
-	"text/template"
+	"html/template"
 	"time"
 
 	"github.com/zitadel/saml/pkg/provider/xml/saml"
