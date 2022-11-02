@@ -9,7 +9,7 @@ import (
 	"io"
 	"net/http"
 	"reflect"
-	"text/template"
+	"html/template"
 	"time"
 
 	"github.com/zitadel/saml/pkg/provider/serviceprovider"
