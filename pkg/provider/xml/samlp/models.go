@@ -43,7 +43,7 @@ type StatusResponseType struct {
 type StatusType struct {
 	XMLName       xml.Name          `xml:"urn:oasis:names:tc:SAML:2.0:protocol Status"`
 	StatusCode    StatusCodeType    `xml:"StatusCode"`
-	StatusMessage string            `xml:"StatusMessage"`
+	StatusMessage string            `xml:"StatusMessage,omitempty"`
 	StatusDetail  *StatusDetailType `xml:"StatusDetail"`
 	//InnerXml      string            `xml:",innerxml"`
 }
