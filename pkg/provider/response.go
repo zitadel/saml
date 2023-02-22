@@ -3,8 +3,8 @@ package provider
 import (
 	"encoding/base64"
 	"fmt"
-	"net/http"
 	"html/template"
+	"net/http"
 	"time"
 
 	"github.com/zitadel/saml/pkg/provider/xml"
@@ -103,6 +103,7 @@ func (r *Response) makeUnsupportedBindingResponse(
 	now := time.Now().UTC()
 	nowStr := now.Format(DefaultTimeFormat)
 	return makeResponse(
+		NewID(),
 		r.RequestID,
 		r.AcsUrl,
 		nowStr,
@@ -118,6 +119,7 @@ func (r *Response) makeResponderFailResponse(
 	now := time.Now().UTC()
 	nowStr := now.Format(DefaultTimeFormat)
 	return makeResponse(
+		NewID(),
 		r.RequestID,
 		r.AcsUrl,
 		nowStr,
@@ -133,6 +135,7 @@ func (r *Response) makeDeniedResponse(
 	now := time.Now().UTC()
 	nowStr := now.Format(DefaultTimeFormat)
 	return makeResponse(
+		NewID(),
 		r.RequestID,
 		r.AcsUrl,
 		nowStr,
@@ -148,6 +151,7 @@ func (r *Response) makeFailedResponse(
 	now := time.Now().UTC()
 	nowStr := now.Format(DefaultTimeFormat)
 	return makeResponse(
+		NewID(),
 		r.RequestID,
 		r.AcsUrl,
 		nowStr,
@@ -177,7 +181,7 @@ func (r *Response) makeAssertionResponse(
 	attributes *Attributes,
 ) *samlp.ResponseType {
 
-	response := makeResponse(r.RequestID, r.AcsUrl, issueInstant, StatusCodeSuccess, "", r.Issuer)
+	response := makeResponse(NewID(), r.RequestID, r.AcsUrl, issueInstant, StatusCodeSuccess, "", r.Issuer)
 	assertion := makeAssertion(r.RequestID, r.AcsUrl, r.SendIP, issueInstant, untilInstant, r.Issuer, attributes.GetNameID(), attributes.GetSAML(), r.Audience, true)
 	response.Assertion = *assertion
 	return response
@@ -219,7 +223,7 @@ func makeAttributeQueryResponse(
 		}
 	}
 
-	response := makeResponse(requestID, "", nowStr, StatusCodeSuccess, "", issuer)
+	response := makeResponse(NewID(), requestID, "", nowStr, StatusCodeSuccess, "", issuer)
 	assertion := makeAssertion(requestID, "", "", nowStr, fiveFromNowStr, issuer, attributes.GetNameID(), providedAttrs, entityID, false)
 	response.Assertion = *assertion
 	return response
@@ -290,6 +294,7 @@ func makeAssertion(
 }
 
 func makeResponse(
+	id string,
 	requestID string,
 	acsURL string,
 	issueInstant string,
@@ -299,7 +304,7 @@ func makeResponse(
 ) *samlp.ResponseType {
 	resp := &samlp.ResponseType{
 		Version:      "2.0",
-		Id:           NewID(),
+		Id:           id,
 		IssueInstant: issueInstant,
 		Status: samlp.StatusType{
 			StatusCode: samlp.StatusCodeType{
