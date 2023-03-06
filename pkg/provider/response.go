@@ -13,7 +13,6 @@ import (
 )
 
 const (
-	DefaultTimeFormat                = "2006-01-02T15:04:05.999999Z"
 	StatusCodeSuccess                = "urn:oasis:names:tc:SAML:2.0:status:Success"
 	StatusCodeVersionMissmatch       = "urn:oasis:names:tc:SAML:2.0:status:VersionMismatch"
 	StatusCodeAuthNFailed            = "urn:oasis:names:tc:SAML:2.0:status:AuthnFailed"
@@ -99,9 +98,10 @@ func (r *Response) sendBackResponse(
 
 func (r *Response) makeUnsupportedBindingResponse(
 	message string,
+	timeFormat string,
 ) *samlp.ResponseType {
 	now := time.Now().UTC()
-	nowStr := now.Format(DefaultTimeFormat)
+	nowStr := now.Format(timeFormat)
 	return makeResponse(
 		NewID(),
 		r.RequestID,
@@ -115,9 +115,10 @@ func (r *Response) makeUnsupportedBindingResponse(
 
 func (r *Response) makeResponderFailResponse(
 	message string,
+	timeFormat string,
 ) *samlp.ResponseType {
 	now := time.Now().UTC()
-	nowStr := now.Format(DefaultTimeFormat)
+	nowStr := now.Format(timeFormat)
 	return makeResponse(
 		NewID(),
 		r.RequestID,
@@ -131,9 +132,10 @@ func (r *Response) makeResponderFailResponse(
 
 func (r *Response) makeDeniedResponse(
 	message string,
+	timeFormat string,
 ) *samlp.ResponseType {
 	now := time.Now().UTC()
-	nowStr := now.Format(DefaultTimeFormat)
+	nowStr := now.Format(timeFormat)
 	return makeResponse(
 		NewID(),
 		r.RequestID,
@@ -147,9 +149,10 @@ func (r *Response) makeDeniedResponse(
 
 func (r *Response) makeFailedResponse(
 	message string,
+	timeFormat string,
 ) *samlp.ResponseType {
 	now := time.Now().UTC()
-	nowStr := now.Format(DefaultTimeFormat)
+	nowStr := now.Format(timeFormat)
 	return makeResponse(
 		NewID(),
 		r.RequestID,
@@ -163,10 +166,11 @@ func (r *Response) makeFailedResponse(
 
 func (r *Response) makeSuccessfulResponse(
 	attributes *Attributes,
+	timeFormat string,
 ) *samlp.ResponseType {
 	now := time.Now().UTC()
-	nowStr := now.Format(DefaultTimeFormat)
-	fiveFromNowStr := now.Add(5 * time.Minute).Format(DefaultTimeFormat)
+	nowStr := now.Format(timeFormat)
+	fiveFromNowStr := now.Add(5 * time.Minute).Format(timeFormat)
 
 	return r.makeAssertionResponse(
 		nowStr,
@@ -200,12 +204,13 @@ func makeAttributeQueryResponse(
 	entityID string,
 	attributes *Attributes,
 	queriedAttrs []saml.AttributeType,
+	timeFormat string,
 ) *samlp.ResponseType {
 	now := time.Now().UTC()
-	nowStr := now.Format(DefaultTimeFormat)
+	nowStr := now.Format(timeFormat)
 	fiveMinutes, _ := time.ParseDuration("5m")
 	fiveFromNow := now.Add(fiveMinutes)
-	fiveFromNowStr := fiveFromNow.Format(DefaultTimeFormat)
+	fiveFromNowStr := fiveFromNow.Format(timeFormat)
 
 	providedAttrs := []*saml.AttributeType{}
 	attrsSaml := attributes.GetSAML()

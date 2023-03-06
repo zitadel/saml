@@ -60,7 +60,7 @@ func (p *IdentityProvider) logoutHandleFunc(w http.ResponseWriter, r *http.Reque
 			return nil
 		},
 		func() {
-			response.sendBackLogoutResponse(w, response.makeUnsupportedlLogoutResponse(fmt.Errorf("failed to decode request: %w", err).Error()))
+			response.sendBackLogoutResponse(w, response.makeUnsupportedlLogoutResponse(fmt.Errorf("failed to decode request: %w", err).Error(), p.timeFormat))
 		},
 	)
 
@@ -71,7 +71,7 @@ func (p *IdentityProvider) logoutHandleFunc(w http.ResponseWriter, r *http.Reque
 			func() string { return logoutRequest.NotOnOrAfter },
 		),
 		func() {
-			response.sendBackLogoutResponse(w, response.makeDeniedLogoutResponse(fmt.Errorf("failed to validate request: %w", err).Error()))
+			response.sendBackLogoutResponse(w, response.makeDeniedLogoutResponse(fmt.Errorf("failed to validate request: %w", err).Error(), p.timeFormat))
 		},
 	)
 
@@ -82,7 +82,7 @@ func (p *IdentityProvider) logoutHandleFunc(w http.ResponseWriter, r *http.Reque
 			return err
 		},
 		func() {
-			response.sendBackLogoutResponse(w, response.makeDeniedLogoutResponse(fmt.Errorf("failed to find registered serviceprovider: %w", err).Error()))
+			response.sendBackLogoutResponse(w, response.makeDeniedLogoutResponse(fmt.Errorf("failed to find registered serviceprovider: %w", err).Error(), p.timeFormat))
 		},
 	)
 
@@ -105,7 +105,7 @@ func (p *IdentityProvider) logoutHandleFunc(w http.ResponseWriter, r *http.Reque
 
 	response.sendBackLogoutResponse(
 		w,
-		response.makeSuccessfulLogoutResponse(),
+		response.makeSuccessfulLogoutResponse(p.timeFormat),
 	)
 	logging.Info(fmt.Sprintf("logout request for user %s", logoutRequest.NameID.Text))
 }

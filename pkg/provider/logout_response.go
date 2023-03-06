@@ -5,8 +5,8 @@ import (
 	"bytes"
 	"encoding/base64"
 	"encoding/xml"
-	"net/http"
 	"html/template"
+	"net/http"
 	"time"
 
 	"github.com/zitadel/saml/pkg/provider/xml/saml"
@@ -67,11 +67,11 @@ func (r *LogoutResponse) sendBackLogoutResponse(w http.ResponseWriter, resp *sam
 	}
 }
 
-func (r *LogoutResponse) makeSuccessfulLogoutResponse() *samlp.LogoutResponseType {
+func (r *LogoutResponse) makeSuccessfulLogoutResponse(timeFormat string) *samlp.LogoutResponseType {
 	return makeLogoutResponse(
 		r.RequestID,
 		r.LogoutURL,
-		time.Now().UTC().Format(DefaultTimeFormat),
+		time.Now().UTC().Format(timeFormat),
 		StatusCodeSuccess,
 		"",
 		getIssuer(r.Issuer),
@@ -80,11 +80,12 @@ func (r *LogoutResponse) makeSuccessfulLogoutResponse() *samlp.LogoutResponseTyp
 
 func (r *LogoutResponse) makeUnsupportedlLogoutResponse(
 	message string,
+	timeFormat string,
 ) *samlp.LogoutResponseType {
 	return makeLogoutResponse(
 		r.RequestID,
 		r.LogoutURL,
-		time.Now().UTC().Format(DefaultTimeFormat),
+		time.Now().UTC().Format(timeFormat),
 		StatusCodeRequestUnsupported,
 		message,
 		getIssuer(r.Issuer),
@@ -93,11 +94,12 @@ func (r *LogoutResponse) makeUnsupportedlLogoutResponse(
 
 func (r *LogoutResponse) makePartialLogoutResponse(
 	message string,
+	timeFormat string,
 ) *samlp.LogoutResponseType {
 	return makeLogoutResponse(
 		r.RequestID,
 		r.LogoutURL,
-		time.Now().UTC().Format(DefaultTimeFormat),
+		time.Now().UTC().Format(timeFormat),
 		StatusCodePartialLogout,
 		message,
 		getIssuer(r.Issuer),
@@ -106,11 +108,12 @@ func (r *LogoutResponse) makePartialLogoutResponse(
 
 func (r *LogoutResponse) makeDeniedLogoutResponse(
 	message string,
+	timeFormat string,
 ) *samlp.LogoutResponseType {
 	return makeLogoutResponse(
 		r.RequestID,
 		r.LogoutURL,
-		time.Now().UTC().Format(DefaultTimeFormat),
+		time.Now().UTC().Format(timeFormat),
 		StatusCodeRequestDenied,
 		message,
 		getIssuer(r.Issuer),
