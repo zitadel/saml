@@ -287,6 +287,7 @@ func checkRequestRequiredContent(
 			if err := checkIfRequestTimeIsStillValid(
 				func() string { return authNRequest.Conditions.NotBefore },
 				func() string { return authNRequest.Conditions.NotOnOrAfter },
+				DefaultTimeFormat,
 			)(); err != nil {
 				return err
 			}

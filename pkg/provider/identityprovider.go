@@ -153,7 +153,7 @@ func (p *IdentityProvider) GetMetadata(ctx context.Context) (*md.IDPSSODescripto
 		return nil, nil, err
 	}
 
-	metadata, aaMetadata := p.conf.getMetadata(ctx, p.GetEntityID(ctx), cert)
+	metadata, aaMetadata := p.conf.getMetadata(ctx, p.GetEntityID(ctx), cert, p.timeFormat)
 	return metadata, aaMetadata, nil
 }
 

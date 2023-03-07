@@ -39,6 +39,7 @@ func (p *IdentityProviderConfig) getMetadata(
 	ctx context.Context,
 	entityID string,
 	idpCertData []byte,
+	timeFormat string,
 ) (*md.IDPSSODescriptorType, *md.AttributeAuthorityDescriptorType) {
 	endpoints := endpointConfigToEndpoints(p.Endpoints)
 
@@ -80,7 +81,7 @@ func (p *IdentityProviderConfig) getMetadata(
 	}
 	validUntil := ""
 	if p.MetadataIDPConfig.ValidUntil != 0 {
-		validUntil = time.Now().Add(p.MetadataIDPConfig.ValidUntil).UTC().Format(defaultTimeLayout)
+		validUntil = time.Now().Add(p.MetadataIDPConfig.ValidUntil).UTC().Format(timeFormat)
 	}
 	cacheDuration := ""
 	if p.MetadataIDPConfig.CacheDuration != "" {

@@ -69,6 +69,7 @@ func (p *IdentityProvider) logoutHandleFunc(w http.ResponseWriter, r *http.Reque
 		checkIfRequestTimeIsStillValid(
 			func() string { return logoutRequest.IssueInstant },
 			func() string { return logoutRequest.NotOnOrAfter },
+			p.timeFormat,
 		),
 		func() {
 			response.sendBackLogoutResponse(w, response.makeDeniedLogoutResponse(fmt.Errorf("failed to validate request: %w", err).Error(), p.timeFormat))
