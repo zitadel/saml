@@ -15,6 +15,7 @@ import (
 )
 
 const (
+	DefaultTimeFormat       = "2006-01-02T15:04:05.999999Z"
 	PostBinding             = "urn:oasis:names:tc:SAML:2.0:bindings:HTTP-POST"
 	RedirectBinding         = "urn:oasis:names:tc:SAML:2.0:bindings:HTTP-Redirect"
 	SOAPBinding             = "urn:oasis:names:tc:SAML:2.0:bindings:SOAP"
@@ -79,10 +80,10 @@ type Provider struct {
 	conf              *Config
 	issuerFromRequest IssuerFromRequest
 	identityProvider  *IdentityProvider
+	timeFormat        string
 }
 
 func NewProvider(
-	ctx context.Context,
 	storage Storage,
 	path string,
 	conf *Config,
@@ -94,7 +95,6 @@ func NewProvider(
 	}
 
 	idp, err := NewIdentityProvider(
-		ctx,
 		metadataEndpoint,
 		conf.IDPConfig,
 		storage,
@@ -243,6 +243,14 @@ func intercept(i IssuerFromRequest, interceptors ...HttpInterceptor) func(handle
 func WithAllowInsecure() Option {
 	return func(p *Provider) error {
 		p.insecure = true
+		return nil
+	}
+}
+
+// WithCustomTimeFormat allows the use of a custom timeformat instead of the default
+func WithCustomTimeFormat(timeFormat string) Option {
+	return func(p *Provider) error {
+		p.identityProvider.timeFormat = timeFormat
 		return nil
 	}
 }

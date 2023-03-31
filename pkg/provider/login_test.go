@@ -1,7 +1,6 @@
 package provider
 
 import (
-	"context"
 	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
@@ -245,7 +244,7 @@ func TestSSO_loginHandleFunc(t *testing.T) {
 				return
 			}
 
-			idp, err := NewIdentityProvider(context.Background(), endpoint, tt.args.config, mockStorage)
+			idp, err := NewIdentityProvider(endpoint, tt.args.config, mockStorage)
 			if (err != nil) != tt.res.err {
 				t.Errorf("NewIdentityProvider() error = %v", err.Error())
 				return

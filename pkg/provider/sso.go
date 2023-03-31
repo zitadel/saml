@@ -71,7 +71,7 @@ func (p *IdentityProvider) ssoHandleFunc(w http.ResponseWriter, r *http.Request)
 		"relayState",
 		func() string { return authRequestForm.RelayState },
 		func() {
-			response.sendBackResponse(r, w, response.makeDeniedResponse(fmt.Errorf("empty relaystate").Error()))
+			response.sendBackResponse(r, w, response.makeDeniedResponse(fmt.Errorf("empty relaystate").Error(), p.timeFormat))
 		},
 	)
 
@@ -80,7 +80,7 @@ func (p *IdentityProvider) ssoHandleFunc(w http.ResponseWriter, r *http.Request)
 		"SAMLRequest",
 		func() string { return authRequestForm.AuthRequest },
 		func() {
-			response.sendBackResponse(r, w, response.makeDeniedResponse(fmt.Errorf("no auth request provided").Error()))
+			response.sendBackResponse(r, w, response.makeDeniedResponse(fmt.Errorf("no auth request provided").Error(), p.timeFormat))
 		},
 	)
 
@@ -90,7 +90,7 @@ func (p *IdentityProvider) ssoHandleFunc(w http.ResponseWriter, r *http.Request)
 		"Signature",
 		func() string { return authRequestForm.Sig },
 		func() {
-			response.sendBackResponse(r, w, response.makeDeniedResponse(fmt.Errorf("signature algorith provided but no signature").Error()))
+			response.sendBackResponse(r, w, response.makeDeniedResponse(fmt.Errorf("signature algorith provided but no signature").Error(), p.timeFormat))
 		},
 	)
 
@@ -105,7 +105,7 @@ func (p *IdentityProvider) ssoHandleFunc(w http.ResponseWriter, r *http.Request)
 			return nil
 		},
 		func() {
-			response.sendBackResponse(r, w, response.makeDeniedResponse(fmt.Errorf("failed to decode request").Error()))
+			response.sendBackResponse(r, w, response.makeDeniedResponse(fmt.Errorf("failed to decode request").Error(), p.timeFormat))
 		},
 	)
 
@@ -120,7 +120,7 @@ func (p *IdentityProvider) ssoHandleFunc(w http.ResponseWriter, r *http.Request)
 			return nil
 		},
 		func() {
-			response.sendBackResponse(r, w, response.makeDeniedResponse(fmt.Errorf("failed to find registered serviceprovider: %w", err).Error()))
+			response.sendBackResponse(r, w, response.makeDeniedResponse(fmt.Errorf("failed to find registered serviceprovider: %w", err).Error(), p.timeFormat))
 		},
 	)
 
@@ -135,7 +135,7 @@ func (p *IdentityProvider) ssoHandleFunc(w http.ResponseWriter, r *http.Request)
 			func() *md.EntityDescriptorType { return sp.Metadata },
 		),
 		func() {
-			response.sendBackResponse(r, w, response.makeDeniedResponse(fmt.Errorf("failed to validate certificate from request: %w", err).Error()))
+			response.sendBackResponse(r, w, response.makeDeniedResponse(fmt.Errorf("failed to validate certificate from request: %w", err).Error(), p.timeFormat))
 		},
 	)
 
@@ -156,7 +156,7 @@ func (p *IdentityProvider) ssoHandleFunc(w http.ResponseWriter, r *http.Request)
 			func(errF error) { err = errF },
 		),
 		func() {
-			response.sendBackResponse(r, w, response.makeDeniedResponse(fmt.Errorf("failed to verify signature: %w", err).Error()))
+			response.sendBackResponse(r, w, response.makeDeniedResponse(fmt.Errorf("failed to verify signature: %w", err).Error(), p.timeFormat))
 		},
 	)
 
@@ -174,7 +174,7 @@ func (p *IdentityProvider) ssoHandleFunc(w http.ResponseWriter, r *http.Request)
 			func(errF error) { err = errF },
 		),
 		func() {
-			response.sendBackResponse(r, w, response.makeDeniedResponse(fmt.Errorf("failed to verify signature: %w", err).Error()))
+			response.sendBackResponse(r, w, response.makeDeniedResponse(fmt.Errorf("failed to verify signature: %w", err).Error(), p.timeFormat))
 		},
 	)
 
@@ -190,7 +190,7 @@ func (p *IdentityProvider) ssoHandleFunc(w http.ResponseWriter, r *http.Request)
 		"acsUrl",
 		func() string { return response.AcsUrl },
 		func() {
-			response.sendBackResponse(r, w, response.makeUnsupportedBindingResponse(fmt.Errorf("missing usable assertion consumer url").Error()))
+			response.sendBackResponse(r, w, response.makeUnsupportedBindingResponse(fmt.Errorf("missing usable assertion consumer url").Error(), p.timeFormat))
 		},
 	)
 
@@ -199,7 +199,7 @@ func (p *IdentityProvider) ssoHandleFunc(w http.ResponseWriter, r *http.Request)
 		"protocol binding",
 		func() string { return response.ProtocolBinding },
 		func() {
-			response.sendBackResponse(r, w, response.makeUnsupportedBindingResponse(fmt.Errorf("missing usable protocol binding").Error()))
+			response.sendBackResponse(r, w, response.makeUnsupportedBindingResponse(fmt.Errorf("missing usable protocol binding").Error(), p.timeFormat))
 		},
 	)
 
@@ -210,7 +210,7 @@ func (p *IdentityProvider) ssoHandleFunc(w http.ResponseWriter, r *http.Request)
 			func() *samlp.AuthnRequestType { return authNRequest },
 		),
 		func() {
-			response.sendBackResponse(r, w, response.makeDeniedResponse(fmt.Errorf("failed to validate request content: %w", err).Error()))
+			response.sendBackResponse(r, w, response.makeDeniedResponse(fmt.Errorf("failed to validate request content: %w", err).Error(), p.timeFormat))
 		},
 	)
 
@@ -228,7 +228,7 @@ func (p *IdentityProvider) ssoHandleFunc(w http.ResponseWriter, r *http.Request)
 			return err
 		},
 		func() {
-			response.sendBackResponse(r, w, response.makeResponderFailResponse(fmt.Errorf("failed to persist request: %w", err).Error()))
+			response.sendBackResponse(r, w, response.makeResponderFailResponse(fmt.Errorf("failed to persist request: %w", err).Error(), p.timeFormat))
 		},
 	)
 
@@ -242,7 +242,7 @@ func (p *IdentityProvider) ssoHandleFunc(w http.ResponseWriter, r *http.Request)
 		http.Redirect(w, r, sp.LoginURL(authRequest.GetID()), http.StatusSeeOther)
 	default:
 		logging.Error(err)
-		response.sendBackResponse(r, w, response.makeUnsupportedBindingResponse(fmt.Errorf("unsupported binding: %s", response.ProtocolBinding).Error()))
+		response.sendBackResponse(r, w, response.makeUnsupportedBindingResponse(fmt.Errorf("unsupported binding: %s", response.ProtocolBinding).Error(), p.timeFormat))
 	}
 	return
 }
@@ -287,6 +287,7 @@ func checkRequestRequiredContent(
 			if err := checkIfRequestTimeIsStillValid(
 				func() string { return authNRequest.Conditions.NotBefore },
 				func() string { return authNRequest.Conditions.NotOnOrAfter },
+				DefaultTimeFormat,
 			)(); err != nil {
 				return err
 			}

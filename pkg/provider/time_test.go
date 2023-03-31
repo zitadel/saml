@@ -5,6 +5,10 @@ import (
 	"time"
 )
 
+const (
+	otherTimeFormat = "2006-01-02T15:04:05.999Z"
+)
+
 func TestTime_checkIfRequestTimeIsStillValid(t *testing.T) {
 	type args struct {
 		notBefore    string
@@ -20,40 +24,56 @@ func TestTime_checkIfRequestTimeIsStillValid(t *testing.T) {
 		{
 			"check ok 1",
 			args{
-				notBefore:    now.Add(-1 * time.Minute).Format(defaultTimeLayout),
-				notOnOrAfter: now.Add(1 * time.Minute).Format(defaultTimeLayout),
+				notBefore:    now.Add(-1 * time.Minute).Format(DefaultTimeFormat),
+				notOnOrAfter: now.Add(1 * time.Minute).Format(DefaultTimeFormat),
 			},
 			false,
 		},
 		{
 			"check ok 2",
 			args{
-				notBefore:    now.Add(-1 * time.Minute).Format(defaultTimeLayout),
-				notOnOrAfter: now.Add(5 * time.Minute).Format(defaultTimeLayout),
+				notBefore:    now.Add(-1 * time.Minute).Format(DefaultTimeFormat),
+				notOnOrAfter: now.Add(5 * time.Minute).Format(DefaultTimeFormat),
 			},
 			false,
 		},
 		{
 			"check ok 3",
 			args{
-				notBefore:    now.Add(-5 * time.Minute).Format(defaultTimeLayout),
-				notOnOrAfter: now.Add(5 * time.Minute).Format(defaultTimeLayout),
+				notBefore:    now.Add(-5 * time.Minute).Format(DefaultTimeFormat),
+				notOnOrAfter: now.Add(5 * time.Minute).Format(DefaultTimeFormat),
+			},
+			false,
+		},
+		{
+			"check ok otherformat",
+			args{
+				notBefore:    now.Add(-5 * time.Minute).Format(otherTimeFormat),
+				notOnOrAfter: now.Add(5 * time.Minute).Format(otherTimeFormat),
 			},
 			false,
 		},
 		{
 			"check not ok 1",
 			args{
-				notBefore:    now.Add(1 * time.Minute).Format(defaultTimeLayout),
-				notOnOrAfter: now.Add(5 * time.Minute).Format(defaultTimeLayout),
+				notBefore:    now.Add(1 * time.Minute).Format(DefaultTimeFormat),
+				notOnOrAfter: now.Add(5 * time.Minute).Format(DefaultTimeFormat),
 			},
 			true,
 		},
 		{
 			"check not ok 2",
 			args{
-				notBefore:    now.Add(-5 * time.Minute).Format(defaultTimeLayout),
-				notOnOrAfter: now.Add(-1 * time.Minute).Format(defaultTimeLayout),
+				notBefore:    now.Add(-5 * time.Minute).Format(DefaultTimeFormat),
+				notOnOrAfter: now.Add(-1 * time.Minute).Format(DefaultTimeFormat),
+			},
+			true,
+		},
+		{
+			"check not ok otherFormat",
+			args{
+				notBefore:    now.Add(-5 * time.Minute).Format(otherTimeFormat),
+				notOnOrAfter: now.Add(-1 * time.Minute).Format(otherTimeFormat),
 			},
 			true,
 		},
@@ -69,7 +89,7 @@ func TestTime_checkIfRequestTimeIsStillValid(t *testing.T) {
 			"check ok only notOnOrAfter",
 			args{
 				notBefore:    "",
-				notOnOrAfter: now.Add(1 * time.Minute).Format(defaultTimeLayout),
+				notOnOrAfter: now.Add(1 * time.Minute).Format(DefaultTimeFormat),
 			},
 			false,
 		},
@@ -77,14 +97,14 @@ func TestTime_checkIfRequestTimeIsStillValid(t *testing.T) {
 			"check not ok only notOnOrAfter",
 			args{
 				notBefore:    "",
-				notOnOrAfter: now.Add(-1 * time.Minute).Format(defaultTimeLayout),
+				notOnOrAfter: now.Add(-1 * time.Minute).Format(DefaultTimeFormat),
 			},
 			true,
 		},
 		{
 			"check not ok only notBefore",
 			args{
-				notBefore:    now.Add(1 * time.Minute).Format(defaultTimeLayout),
+				notBefore:    now.Add(1 * time.Minute).Format(DefaultTimeFormat),
 				notOnOrAfter: "",
 			},
 			true,
@@ -92,7 +112,7 @@ func TestTime_checkIfRequestTimeIsStillValid(t *testing.T) {
 		{
 			"check ok only notBefore",
 			args{
-				notBefore:    now.Add(-1 * time.Minute).Format(defaultTimeLayout),
+				notBefore:    now.Add(-1 * time.Minute).Format(DefaultTimeFormat),
 				notOnOrAfter: "",
 			},
 			false,
@@ -124,7 +144,7 @@ func TestTime_checkIfRequestTimeIsStillValid(t *testing.T) {
 				return tt.args.notOnOrAfter
 			}
 
-			errF := checkIfRequestTimeIsStillValid(notBeforeF, notOnOrAfterF)
+			errF := checkIfRequestTimeIsStillValid(notBeforeF, notOnOrAfterF, DefaultTimeFormat)
 			err := errF()
 			if (err != nil) != tt.res {
 				t.Errorf("ParseCertificates() got = %v, want %v", err != nil, tt.res)

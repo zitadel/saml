@@ -34,7 +34,7 @@ func (p *IdentityProvider) callbackHandleFunc(w http.ResponseWriter, r *http.Req
 	authRequest, err := p.storage.AuthRequestByID(r.Context(), requestID)
 	if err != nil {
 		logging.Error(err)
-		response.sendBackResponse(r, w, response.makeDeniedResponse(fmt.Errorf("failed to get request: %w", err).Error()))
+		response.sendBackResponse(r, w, response.makeDeniedResponse(fmt.Errorf("failed to get request: %w", err).Error(), p.timeFormat))
 		return
 	}
 	response.RequestID = authRequest.GetAuthRequestID()
@@ -63,19 +63,19 @@ func (p *IdentityProvider) callbackHandleFunc(w http.ResponseWriter, r *http.Req
 		return
 	}
 
-	samlResponse := response.makeSuccessfulResponse(attrs)
+	samlResponse := response.makeSuccessfulResponse(attrs, p.timeFormat)
 
 	switch response.ProtocolBinding {
 	case PostBinding:
 		if err := createPostSignature(r.Context(), samlResponse, p); err != nil {
 			logging.Error(err)
-			response.sendBackResponse(r, w, response.makeResponderFailResponse(fmt.Errorf("failed to sign response: %w", err).Error()))
+			response.sendBackResponse(r, w, response.makeResponderFailResponse(fmt.Errorf("failed to sign response: %w", err).Error(), p.timeFormat))
 			return
 		}
 	case RedirectBinding:
 		if err := createRedirectSignature(r.Context(), samlResponse, p, response); err != nil {
 			logging.Error(err)
-			response.sendBackResponse(r, w, response.makeResponderFailResponse(fmt.Errorf("failed to sign response: %w", err).Error()))
+			response.sendBackResponse(r, w, response.makeResponderFailResponse(fmt.Errorf("failed to sign response: %w", err).Error(), p.timeFormat))
 			return
 		}
 	}

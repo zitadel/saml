@@ -6,10 +6,10 @@ import (
 	"crypto/rsa"
 	"encoding/pem"
 	"fmt"
+	"html/template"
 	"io"
 	"net/http"
 	"reflect"
-	"html/template"
 	"time"
 
 	"github.com/zitadel/saml/pkg/provider/serviceprovider"
@@ -67,6 +67,8 @@ type IdentityProvider struct {
 
 	metadataEndpoint *Endpoint
 	endpoints        *Endpoints
+
+	timeFormat string
 }
 
 type Endpoints struct {
@@ -77,7 +79,7 @@ type Endpoints struct {
 	attributeEndpoint    Endpoint
 }
 
-func NewIdentityProvider(ctx context.Context, metadata Endpoint, conf *IdentityProviderConfig, storage IDPStorage) (*IdentityProvider, error) {
+func NewIdentityProvider(metadata Endpoint, conf *IdentityProviderConfig, storage IDPStorage) (*IdentityProvider, error) {
 	postTemplate, err := template.New("post").Parse(postTemplate)
 	if err != nil {
 		return nil, err
@@ -95,6 +97,7 @@ func NewIdentityProvider(ctx context.Context, metadata Endpoint, conf *IdentityP
 		postTemplate:     postTemplate,
 		logoutTemplate:   logoutTemplate,
 		endpoints:        endpointConfigToEndpoints(conf.Endpoints),
+		timeFormat:       DefaultTimeFormat,
 	}
 
 	if conf.MetadataIDPConfig == nil {
@@ -150,7 +153,7 @@ func (p *IdentityProvider) GetMetadata(ctx context.Context) (*md.IDPSSODescripto
 		return nil, nil, err
 	}
 
-	metadata, aaMetadata := p.conf.getMetadata(ctx, p.GetEntityID(ctx), cert)
+	metadata, aaMetadata := p.conf.getMetadata(ctx, p.GetEntityID(ctx), cert, p.timeFormat)
 	return metadata, aaMetadata, nil
 }
 
