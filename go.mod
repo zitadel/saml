@@ -4,7 +4,7 @@ go 1.17
 
 require (
 	github.com/amdonov/xmlsig v0.1.0
-	github.com/beevik/etree v1.1.0
+	github.com/beevik/etree v1.1.4
 	github.com/golang/mock v1.6.0
 	github.com/google/uuid v1.3.0
 	github.com/gorilla/handlers v1.5.1
