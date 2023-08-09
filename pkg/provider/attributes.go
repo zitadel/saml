@@ -14,13 +14,20 @@ const (
 	AttributeUserID
 )
 
+type CustomAttribute struct {
+	FriendlyName   string
+	NameFormat     string
+	AttributeValue []string
+}
+
 type Attributes struct {
-	email     string
-	fullName  string
-	givenName string
-	surname   string
-	userID    string
-	username  string
+	email            string
+	fullName         string
+	givenName        string
+	surname          string
+	userID           string
+	username         string
+	customAttributes map[string]*CustomAttribute
 }
 
 var _ models.AttributeSetter = &Attributes{}
@@ -54,6 +61,17 @@ func (a *Attributes) SetUsername(value string) {
 
 func (a *Attributes) SetUserID(value string) {
 	a.userID = value
+}
+
+func (a *Attributes) SetCustomAttribute(name, friendlyName, nameFormat string, attributeValue []string) {
+	if a.customAttributes == nil {
+		a.customAttributes = make(map[string]*CustomAttribute)
+	}
+	a.customAttributes[name] = &CustomAttribute{
+		FriendlyName:   friendlyName,
+		NameFormat:     nameFormat,
+		AttributeValue: attributeValue,
+	}
 }
 
 func (a *Attributes) GetSAML() []*saml.AttributeType {
@@ -98,6 +116,14 @@ func (a *Attributes) GetSAML() []*saml.AttributeType {
 			Name:           "UserID",
 			NameFormat:     "urn:oasis:names:tc:SAML:2.0:attrname-format:basic",
 			AttributeValue: []string{a.userID},
+		})
+	}
+	for name, attr := range a.customAttributes {
+		attrs = append(attrs, &saml.AttributeType{
+			Name:           name,
+			FriendlyName:   attr.FriendlyName,
+			NameFormat:     attr.NameFormat,
+			AttributeValue: attr.AttributeValue,
 		})
 	}
 	return attrs

@@ -24,4 +24,5 @@ type AttributeSetter interface {
 	SetSurname(string)
 	SetUserID(string)
 	SetUsername(string)
+	SetCustomAttribute(name string, friendlyName string, nameFormat string, attributeValue []string)
 }
