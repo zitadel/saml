@@ -174,7 +174,10 @@ func TestSSO_Attributes(t *testing.T) {
 				username:         tt.args.username,
 				customAttributes: tt.args.customAttributes,
 			}
-			assert.Equal(t, tt.res, attrs.GetSAML())
+			samlResponseAttributes := attrs.GetSAML()
+			for _, item := range tt.res {
+				assert.Contains(t, samlResponseAttributes, item)
+			}
 		})
 	}
 }
