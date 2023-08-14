@@ -297,7 +297,7 @@ func idpStorageWithResponseCertAndApp(
 ) *mock.MockIDPStorage {
 	mockStorage := idpStorageWithResponseCert(t, cert, pKey)
 	mockStorage.EXPECT().GetEntityIDByAppID(gomock.Any(), appID).Return(entityID, spErr).MinTimes(0).MaxTimes(1)
-	mockStorage.EXPECT().SetUserinfoWithUserID(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).MinTimes(0).MaxTimes(1)
+	mockStorage.EXPECT().SetUserinfoWithUserID(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).MinTimes(0).MaxTimes(1)
 
 	request := mock.NewMockAuthRequestInt(gomock.NewController(t))
 	request.EXPECT().GetAuthRequestID().Return(samlAuthRequestID).MinTimes(0).MaxTimes(1)
@@ -306,7 +306,7 @@ func idpStorageWithResponseCertAndApp(
 	request.EXPECT().GetAccessConsumerServiceURL().Return(acsURL).MinTimes(0).MaxTimes(1)
 	request.EXPECT().GetUserID().Return(userID).MinTimes(0).MaxTimes(1)
 	request.EXPECT().Done().Return(done).MinTimes(0).MaxTimes(1)
-	request.EXPECT().GetApplicationID().Return(appID).MinTimes(0).MaxTimes(1)
+	request.EXPECT().GetApplicationID().Return(appID).MinTimes(0).MaxTimes(2)
 	mockStorage.EXPECT().AuthRequestByID(gomock.Any(), authRequestID).Return(request, nil).MinTimes(0).MaxTimes(1)
 
 	return mockStorage

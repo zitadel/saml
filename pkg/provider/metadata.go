@@ -71,7 +71,7 @@ func (p *IdentityProviderConfig) getMetadata(
 	}
 
 	attrs := &Attributes{
-		"empty", "empty", "empty", "empty", "empty", "empty",
+		"empty", "empty", "empty", "empty", "empty", "empty", nil,
 	}
 	attrsSaml := attrs.GetSAML()
 	for _, attr := range attrsSaml {
