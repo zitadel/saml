@@ -261,7 +261,6 @@ func makeAssertion(
 					Method: "urn:oasis:names:tc:SAML:2.0:cm:bearer",
 					SubjectConfirmationData: &saml.SubjectConfirmationDataType{
 						InResponseTo: requestID,
-						NotBefore:    issueInstant,
 						NotOnOrAfter: untilInstant,
 					},
 				},
