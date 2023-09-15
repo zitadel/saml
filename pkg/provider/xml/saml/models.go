@@ -67,7 +67,6 @@ type SubjectConfirmationType struct {
 
 type SubjectConfirmationDataType struct {
 	XMLName      xml.Name `xml:"urn:oasis:names:tc:SAML:2.0:assertion SubjectConfirmationData"`
-	NotBefore    string   `xml:"NotBefore,attr,omitempty"`
 	NotOnOrAfter string   `xml:"NotOnOrAfter,attr,omitempty"`
 	Recipient    string   `xml:"Recipient,attr,omitempty"`
 	InResponseTo string   `xml:"InResponseTo,attr,omitempty"`
