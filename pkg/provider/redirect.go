@@ -42,9 +42,6 @@ func verifyRedirectSignature(
 		if authRequest() == "" {
 			return fmt.Errorf("no authrequest provided but required")
 		}
-		if relayState() == "" {
-			return fmt.Errorf("no relaystate provided but required")
-		}
 		if sig() == "" {
 			return fmt.Errorf("no signature provided but required")
 		}
