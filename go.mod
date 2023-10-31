@@ -1,6 +1,6 @@
 module github.com/zitadel/saml
 
-go 1.17
+go 1.19
 
 require (
 	github.com/amdonov/xmlsig v0.1.0
@@ -11,7 +11,7 @@ require (
 	github.com/gorilla/mux v1.8.0
 	github.com/russellhaering/goxmldsig v1.4.0
 	github.com/stretchr/testify v1.8.4
-	github.com/zitadel/logging v0.3.4
+	github.com/zitadel/logging v0.5.0
 )
 
 require (
@@ -20,6 +20,7 @@ require (
 	github.com/jonboulle/clockwork v0.2.2 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 	github.com/sirupsen/logrus v1.8.1 // indirect
-	golang.org/x/sys v0.1.0 // indirect
+	golang.org/x/exp v0.0.0-20230817173708-d852ddb80c63 // indirect
+	golang.org/x/sys v0.11.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )

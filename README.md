@@ -61,12 +61,10 @@ Versions that also build are marked with :warning:.
 
 | Version | Supported          |
 |---------|--------------------|
-| <1.15   | :x:                |
-| 1.15    | :warning:          |
-| 1.16    | :warning:          |
-| 1.17    | :white_check_mark: |
-| 1.18    | :white_check_mark: |
-| 1.19    | :white_check_mark: |
+| <1.19   | :x:                |
+| 1.19    | :warning:          |
+| 1.20    | :white_check_mark: |
+| 1.21    | :white_check_mark: |
 
 ## Why another library
 
