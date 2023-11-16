@@ -512,7 +512,7 @@ func TestSignature_CreatePost(t *testing.T) {
 			}
 			resp.Signature = sig
 
-			respStr, err := saml_xml.Marshal(resp)
+			respData, err := saml_xml.Marshal(resp)
 			if err != nil {
 				if (err != nil) != tt.res.err {
 					t.Errorf("Create() marshall response for signing")
@@ -521,7 +521,7 @@ func TestSignature_CreatePost(t *testing.T) {
 			}
 
 			doc := etree.NewDocument()
-			if err := doc.ReadFromBytes([]byte(respStr)); err != nil {
+			if err := doc.ReadFromBytes(respData); err != nil {
 				if (err != nil) != tt.res.err {
 					t.Errorf("Cert() failed to read response")
 				}

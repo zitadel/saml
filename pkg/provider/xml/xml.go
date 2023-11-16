@@ -19,27 +19,27 @@ const (
 	EncodingDeflate = "urn:oasis:names:tc:SAML:2.0:bindings:URL-Encoding:DEFLATE"
 )
 
-func Marshal(data interface{}) (string, error) {
+func Marshal(data interface{}) ([]byte, error) {
 	var xmlbuff bytes.Buffer
 
 	memWriter := bufio.NewWriter(&xmlbuff)
 	_, err := memWriter.Write([]byte(xml.Header))
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 
 	encoder := xml.NewEncoder(memWriter)
 	err = encoder.Encode(data)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 
 	err = memWriter.Flush()
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 
-	return xmlbuff.String(), nil
+	return xmlbuff.Bytes(), nil
 }
 
 func DeflateAndBase64(data []byte) ([]byte, error) {

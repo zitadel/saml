@@ -559,8 +559,8 @@ func TestSSO_ssoHandleFunc(t *testing.T) {
 				},
 			},
 			res{
-				code:  500,
-				state: "",
+				code:  200,
+				state: StatusCodeRequestDenied,
 				err:   false,
 			}},
 		{
