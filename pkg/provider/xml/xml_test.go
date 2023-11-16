@@ -1,7 +1,7 @@
 package xml_test
 
 import (
-	"slices"
+	"reflect"
 	"testing"
 
 	"github.com/zitadel/saml/pkg/provider/xml"
@@ -31,7 +31,6 @@ func Test_XmlMarshal(t *testing.T) {
 			},
 		},
 	}
-
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			xmlStruct := XML{InnerXml: tt.arg}
@@ -42,7 +41,7 @@ func Test_XmlMarshal(t *testing.T) {
 				return
 			}
 
-			if !slices.Equal(xmlData, tt.res.metadata) {
+			if !reflect.DeepEqual(tt.res.metadata, xmlData) {
 				t.Errorf("Marshal() error expected: %v, got %v", tt.res.metadata, xmlData)
 				return
 			}
