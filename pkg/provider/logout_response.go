@@ -40,6 +40,7 @@ func (r *LogoutResponse) sendBackLogoutResponse(w http.ResponseWriter, resp *sam
 			r.ErrorFunc(err)
 			return
 		}
+		return
 	}
 
 	data := LogoutResponseForm{

@@ -66,6 +66,7 @@ func (r *Response) sendBackResponse(
 			r.ErrorFunc(err)
 			return
 		}
+		return
 	}
 
 	switch r.ProtocolBinding {
