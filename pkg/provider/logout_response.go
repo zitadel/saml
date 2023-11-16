@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"encoding/base64"
 	"encoding/xml"
+	"fmt"
 	"html/template"
 	"net/http"
 	"time"
@@ -52,13 +53,17 @@ func (r *LogoutResponse) sendBackLogoutResponse(w http.ResponseWriter, resp *sam
 		r.ErrorFunc(err)
 		return
 	}
-
-	samlMessage := base64.StdEncoding.EncodeToString(xmlbuff.Bytes())
+	samlMessageBytes := xmlbuff.Bytes()
 
 	data := LogoutResponseForm{
 		RelayState:   r.RelayState,
-		SAMLResponse: samlMessage,
+		SAMLResponse: base64.StdEncoding.EncodeToString(samlMessageBytes),
 		LogoutURL:    r.LogoutURL,
+	}
+	if data.LogoutURL == "" {
+		w.Write(samlMessageBytes)
+		http.Error(w, fmt.Errorf("failed to find logout url").Error(), http.StatusInternalServerError)
+		return
 	}
 
 	if err := r.LogoutTemplate.Execute(w, data); err != nil {

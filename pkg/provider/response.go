@@ -58,6 +58,11 @@ func (r *Response) doResponse(request *http.Request, w http.ResponseWriter, resp
 			r.AcsUrl,
 		}
 
+		if data.AssertionConsumerServiceURL == "" {
+			w.Write([]byte(response))
+			http.Error(w, fmt.Errorf("failed to find AssertionConsumerServiceURL").Error(), http.StatusInternalServerError)
+			return
+		}
 		if err := r.PostTemplate.Execute(w, data); err != nil {
 			r.ErrorFunc(err)
 			return
