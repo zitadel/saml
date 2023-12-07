@@ -71,12 +71,12 @@ func createRedirectSignature(
 	idp *IdentityProvider,
 	response *Response,
 ) error {
-	respStr, err := xml.Marshal(samlResponse)
+	resp, err := xml.Marshal(samlResponse)
 	if err != nil {
 		return err
 	}
 
-	respData, err := xml.DeflateAndBase64([]byte(respStr))
+	respData, err := xml.DeflateAndBase64(resp)
 	if err != nil {
 		return err
 	}

@@ -41,39 +41,7 @@ type Response struct {
 }
 
 func (r *Response) doResponse(request *http.Request, w http.ResponseWriter, response string) {
-	if r.AcsUrl == "" {
-		if err := xml.Write(w, []byte(response)); err != nil {
-			r.ErrorFunc(err)
-			return
-		}
-	}
 
-	switch r.ProtocolBinding {
-	case PostBinding:
-		respData := base64.StdEncoding.EncodeToString([]byte(response))
-
-		data := AuthResponseForm{
-			r.RelayState,
-			respData,
-			r.AcsUrl,
-		}
-
-		if err := r.PostTemplate.Execute(w, data); err != nil {
-			r.ErrorFunc(err)
-			return
-		}
-	case RedirectBinding:
-		respData, err := xml.DeflateAndBase64([]byte(response))
-		if err != nil {
-			r.ErrorFunc(err)
-			return
-		}
-
-		http.Redirect(w, request, fmt.Sprintf("%s?%s", r.AcsUrl, buildRedirectQuery(string(respData), r.RelayState, r.SigAlg, r.Signature)), http.StatusFound)
-		return
-	default:
-		//TODO: no binding
-	}
 }
 
 type AuthResponseForm struct {
@@ -87,13 +55,46 @@ func (r *Response) sendBackResponse(
 	w http.ResponseWriter,
 	resp *samlp.ResponseType,
 ) {
-	respStr, err := xml.Marshal(resp)
+	respData, err := xml.Marshal(resp)
 	if err != nil {
 		r.ErrorFunc(err)
 		return
 	}
 
-	r.doResponse(req, w, respStr)
+	if r.AcsUrl == "" {
+		if err := xml.Write(w, respData); err != nil {
+			r.ErrorFunc(err)
+			return
+		}
+		return
+	}
+
+	switch r.ProtocolBinding {
+	case PostBinding:
+		respData := base64.StdEncoding.EncodeToString(respData)
+
+		data := AuthResponseForm{
+			r.RelayState,
+			respData,
+			r.AcsUrl,
+		}
+
+		if err := r.PostTemplate.Execute(w, data); err != nil {
+			r.ErrorFunc(err)
+			return
+		}
+	case RedirectBinding:
+		respData, err := xml.DeflateAndBase64(respData)
+		if err != nil {
+			r.ErrorFunc(err)
+			return
+		}
+
+		http.Redirect(w, req, fmt.Sprintf("%s?%s", r.AcsUrl, buildRedirectQuery(string(respData), r.RelayState, r.SigAlg, r.Signature)), http.StatusFound)
+		return
+	default:
+		//TODO: no binding
+	}
 }
 
 func (r *Response) makeUnsupportedBindingResponse(

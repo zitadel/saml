@@ -1,14 +1,12 @@
 package provider
 
 import (
-	"bufio"
-	"bytes"
 	"encoding/base64"
-	"encoding/xml"
 	"html/template"
 	"net/http"
 	"time"
 
+	"github.com/zitadel/saml/pkg/provider/xml"
 	"github.com/zitadel/saml/pkg/provider/xml/saml"
 	"github.com/zitadel/saml/pkg/provider/xml/samlp"
 )
@@ -31,33 +29,23 @@ type LogoutResponseForm struct {
 }
 
 func (r *LogoutResponse) sendBackLogoutResponse(w http.ResponseWriter, resp *samlp.LogoutResponseType) {
-	var xmlbuff bytes.Buffer
-
-	memWriter := bufio.NewWriter(&xmlbuff)
-	_, err := memWriter.Write([]byte(xml.Header))
+	respData, err := xml.Marshal(resp)
 	if err != nil {
 		r.ErrorFunc(err)
 		return
 	}
 
-	encoder := xml.NewEncoder(memWriter)
-	err = encoder.Encode(resp)
-	if err != nil {
-		r.ErrorFunc(err)
+	if r.LogoutURL == "" {
+		if err := xml.Write(w, respData); err != nil {
+			r.ErrorFunc(err)
+			return
+		}
 		return
 	}
-
-	err = memWriter.Flush()
-	if err != nil {
-		r.ErrorFunc(err)
-		return
-	}
-
-	samlMessage := base64.StdEncoding.EncodeToString(xmlbuff.Bytes())
 
 	data := LogoutResponseForm{
 		RelayState:   r.RelayState,
-		SAMLResponse: samlMessage,
+		SAMLResponse: base64.StdEncoding.EncodeToString(respData),
 		LogoutURL:    r.LogoutURL,
 	}
 
