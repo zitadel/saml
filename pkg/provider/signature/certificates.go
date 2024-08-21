@@ -7,17 +7,22 @@ import (
 	"encoding/base64"
 	"encoding/pem"
 	"fmt"
+	"regexp"
 	"strings"
 
 	"github.com/amdonov/xmlsig"
 	dsig "github.com/russellhaering/goxmldsig"
 )
 
+var (
+	spaceRegex = regexp.MustCompile(`\s+`)
+)
+
 func ParseCertificates(certStrs []string) ([]*x509.Certificate, error) {
 	certs := make([]*x509.Certificate, len(certStrs))
 
 	for i, certStr := range certStrs {
-		certStr = strings.TrimSpace(certStr)
+		certStr = spaceRegex.ReplaceAllString(certStr, "")
 		certStr = strings.TrimPrefix(strings.TrimSuffix(certStr, "-----ENDCERTIFICATE-----"), "-----BEGINCERTIFICATE-----")
 		certBytes, err := base64.StdEncoding.DecodeString(certStr)
 		if err != nil {
