@@ -41,6 +41,9 @@ type MetadataIDPConfig struct {
 type IdentityProviderConfig struct {
 	MetadataIDPConfig *MetadataIDPConfig
 
+	PostTemplate   *template.Template
+	LogoutTemplate *template.Template
+
 	SignatureAlgorithm  string
 	DigestAlgorithm     string
 	EncryptionAlgorithm string
@@ -79,25 +82,29 @@ type Endpoints struct {
 	attributeEndpoint    Endpoint
 }
 
-func NewIdentityProvider(metadata Endpoint, conf *IdentityProviderConfig, storage IDPStorage) (*IdentityProvider, error) {
-	postTemplate, err := template.New("post").Parse(postTemplate)
-	if err != nil {
-		return nil, err
-	}
-
-	logoutTemplate, err := template.New("logout").Parse(logoutTemplate)
-	if err != nil {
-		return nil, err
-	}
-
+func NewIdentityProvider(metadata Endpoint, conf *IdentityProviderConfig, storage IDPStorage) (_ *IdentityProvider, err error) {
 	idp := &IdentityProvider{
 		storage:          storage,
 		metadataEndpoint: &metadata,
 		conf:             conf,
-		postTemplate:     postTemplate,
-		logoutTemplate:   logoutTemplate,
+		postTemplate:     conf.PostTemplate,
+		logoutTemplate:   conf.LogoutTemplate,
 		endpoints:        endpointConfigToEndpoints(conf.Endpoints),
 		timeFormat:       DefaultTimeFormat,
+	}
+
+	if conf.PostTemplate == nil {
+		idp.postTemplate, err = template.New("post").Parse(postTemplate)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	if conf.LogoutTemplate == nil {
+		idp.logoutTemplate, err = template.New("logout").Parse(logoutTemplate)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	if conf.MetadataIDPConfig == nil {
