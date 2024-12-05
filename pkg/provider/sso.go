@@ -61,7 +61,7 @@ func (p *IdentityProvider) ssoHandleFunc(w http.ResponseWriter, r *http.Request)
 			return nil
 		},
 		func() {
-			response.sendBackResponse(r, w, response.makeDeniedResponse(fmt.Errorf("failed to parse form").Error(), p.timeFormat))
+			response.sendBackResponse(r, w, response.MakeFailedResponse(StatusCodeRequestDenied, fmt.Errorf("failed to parse form").Error(), p.timeFormat))
 		},
 	)
 
@@ -70,7 +70,7 @@ func (p *IdentityProvider) ssoHandleFunc(w http.ResponseWriter, r *http.Request)
 		"SAMLRequest",
 		func() string { return authRequestForm.AuthRequest },
 		func() {
-			response.sendBackResponse(r, w, response.makeDeniedResponse(fmt.Errorf("no auth request provided").Error(), p.timeFormat))
+			response.sendBackResponse(r, w, response.MakeFailedResponse(StatusCodeRequestDenied, fmt.Errorf("no auth request provided").Error(), p.timeFormat))
 		},
 	)
 
@@ -80,7 +80,7 @@ func (p *IdentityProvider) ssoHandleFunc(w http.ResponseWriter, r *http.Request)
 		"Signature",
 		func() string { return authRequestForm.Sig },
 		func() {
-			response.sendBackResponse(r, w, response.makeDeniedResponse(fmt.Errorf("signature algorith provided but no signature").Error(), p.timeFormat))
+			response.sendBackResponse(r, w, response.MakeFailedResponse(StatusCodeRequestDenied, fmt.Errorf("signature algorith provided but no signature").Error(), p.timeFormat))
 		},
 	)
 
@@ -95,7 +95,7 @@ func (p *IdentityProvider) ssoHandleFunc(w http.ResponseWriter, r *http.Request)
 			return nil
 		},
 		func() {
-			response.sendBackResponse(r, w, response.makeDeniedResponse(fmt.Errorf("failed to decode request").Error(), p.timeFormat))
+			response.sendBackResponse(r, w, response.MakeFailedResponse(StatusCodeRequestDenied, fmt.Errorf("failed to decode request").Error(), p.timeFormat))
 		},
 	)
 
@@ -110,7 +110,7 @@ func (p *IdentityProvider) ssoHandleFunc(w http.ResponseWriter, r *http.Request)
 			return nil
 		},
 		func() {
-			response.sendBackResponse(r, w, response.makeDeniedResponse(fmt.Errorf("failed to find registered serviceprovider: %w", err).Error(), p.timeFormat))
+			response.sendBackResponse(r, w, response.MakeFailedResponse(StatusCodeRequestDenied, fmt.Errorf("failed to find registered serviceprovider: %w", err).Error(), p.timeFormat))
 		},
 	)
 
@@ -125,7 +125,7 @@ func (p *IdentityProvider) ssoHandleFunc(w http.ResponseWriter, r *http.Request)
 			func() *md.EntityDescriptorType { return sp.Metadata },
 		),
 		func() {
-			response.sendBackResponse(r, w, response.makeDeniedResponse(fmt.Errorf("failed to validate certificate from request: %w", err).Error(), p.timeFormat))
+			response.sendBackResponse(r, w, response.MakeFailedResponse(StatusCodeRequestDenied, fmt.Errorf("failed to validate certificate from request: %w", err).Error(), p.timeFormat))
 		},
 	)
 
@@ -146,7 +146,7 @@ func (p *IdentityProvider) ssoHandleFunc(w http.ResponseWriter, r *http.Request)
 			func(errF error) { err = errF },
 		),
 		func() {
-			response.sendBackResponse(r, w, response.makeDeniedResponse(fmt.Errorf("failed to verify signature: %w", err).Error(), p.timeFormat))
+			response.sendBackResponse(r, w, response.MakeFailedResponse(StatusCodeRequestDenied, fmt.Errorf("failed to verify signature: %w", err).Error(), p.timeFormat))
 		},
 	)
 
@@ -164,7 +164,7 @@ func (p *IdentityProvider) ssoHandleFunc(w http.ResponseWriter, r *http.Request)
 			func(errF error) { err = errF },
 		),
 		func() {
-			response.sendBackResponse(r, w, response.makeDeniedResponse(fmt.Errorf("failed to verify signature: %w", err).Error(), p.timeFormat))
+			response.sendBackResponse(r, w, response.MakeFailedResponse(StatusCodeRequestDenied, fmt.Errorf("failed to verify signature: %w", err).Error(), p.timeFormat))
 		},
 	)
 
@@ -180,7 +180,7 @@ func (p *IdentityProvider) ssoHandleFunc(w http.ResponseWriter, r *http.Request)
 		"acsUrl",
 		func() string { return response.AcsUrl },
 		func() {
-			response.sendBackResponse(r, w, response.makeUnsupportedBindingResponse(fmt.Errorf("missing usable assertion consumer url").Error(), p.timeFormat))
+			response.sendBackResponse(r, w, response.MakeFailedResponse(StatusCodeUnsupportedBinding, fmt.Errorf("missing usable assertion consumer url").Error(), p.timeFormat))
 		},
 	)
 
@@ -189,7 +189,7 @@ func (p *IdentityProvider) ssoHandleFunc(w http.ResponseWriter, r *http.Request)
 		"protocol binding",
 		func() string { return response.ProtocolBinding },
 		func() {
-			response.sendBackResponse(r, w, response.makeUnsupportedBindingResponse(fmt.Errorf("missing usable protocol binding").Error(), p.timeFormat))
+			response.sendBackResponse(r, w, response.MakeFailedResponse(StatusCodeUnsupportedBinding, fmt.Errorf("missing usable protocol binding").Error(), p.timeFormat))
 		},
 	)
 
@@ -200,7 +200,7 @@ func (p *IdentityProvider) ssoHandleFunc(w http.ResponseWriter, r *http.Request)
 			func() *samlp.AuthnRequestType { return authNRequest },
 		),
 		func() {
-			response.sendBackResponse(r, w, response.makeDeniedResponse(fmt.Errorf("failed to validate request content: %w", err).Error(), p.timeFormat))
+			response.sendBackResponse(r, w, response.MakeFailedResponse(StatusCodeRequestDenied, fmt.Errorf("failed to validate request content: %w", err).Error(), p.timeFormat))
 		},
 	)
 
@@ -218,7 +218,7 @@ func (p *IdentityProvider) ssoHandleFunc(w http.ResponseWriter, r *http.Request)
 			return err
 		},
 		func() {
-			response.sendBackResponse(r, w, response.makeResponderFailResponse(fmt.Errorf("failed to persist request: %w", err).Error(), p.timeFormat))
+			response.sendBackResponse(r, w, response.MakeFailedResponse(StatusCodeResponder, fmt.Errorf("failed to persist request: %w", err).Error(), p.timeFormat))
 		},
 	)
 
@@ -232,7 +232,7 @@ func (p *IdentityProvider) ssoHandleFunc(w http.ResponseWriter, r *http.Request)
 		http.Redirect(w, r, sp.LoginURL(authRequest.GetID()), http.StatusSeeOther)
 	default:
 		logging.Error(err)
-		response.sendBackResponse(r, w, response.makeUnsupportedBindingResponse(fmt.Errorf("unsupported binding: %s", response.ProtocolBinding).Error(), p.timeFormat))
+		response.sendBackResponse(r, w, response.MakeFailedResponse(StatusCodeUnsupportedBinding, fmt.Errorf("unsupported binding: %s", response.ProtocolBinding).Error(), p.timeFormat))
 	}
 	return
 }

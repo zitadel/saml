@@ -40,10 +40,6 @@ type Response struct {
 	SendIP    string
 }
 
-func (r *Response) doResponse(request *http.Request, w http.ResponseWriter, response string) {
-
-}
-
 type AuthResponseForm struct {
 	RelayState                  string
 	SAMLResponse                string
@@ -97,7 +93,8 @@ func (r *Response) sendBackResponse(
 	}
 }
 
-func (r *Response) makeUnsupportedBindingResponse(
+func (r *Response) MakeFailedResponse(
+	reason string,
 	message string,
 	timeFormat string,
 ) *samlp.ResponseType {
@@ -108,64 +105,13 @@ func (r *Response) makeUnsupportedBindingResponse(
 		r.RequestID,
 		r.AcsUrl,
 		nowStr,
-		StatusCodeUnsupportedBinding,
+		reason,
 		message,
 		r.Issuer,
 	)
 }
 
-func (r *Response) makeResponderFailResponse(
-	message string,
-	timeFormat string,
-) *samlp.ResponseType {
-	now := time.Now().UTC()
-	nowStr := now.Format(timeFormat)
-	return makeResponse(
-		NewID(),
-		r.RequestID,
-		r.AcsUrl,
-		nowStr,
-		StatusCodeResponder,
-		message,
-		r.Issuer,
-	)
-}
-
-func (r *Response) makeDeniedResponse(
-	message string,
-	timeFormat string,
-) *samlp.ResponseType {
-	now := time.Now().UTC()
-	nowStr := now.Format(timeFormat)
-	return makeResponse(
-		NewID(),
-		r.RequestID,
-		r.AcsUrl,
-		nowStr,
-		StatusCodeRequestDenied,
-		message,
-		r.Issuer,
-	)
-}
-
-func (r *Response) makeFailedResponse(
-	message string,
-	timeFormat string,
-) *samlp.ResponseType {
-	now := time.Now().UTC()
-	nowStr := now.Format(timeFormat)
-	return makeResponse(
-		NewID(),
-		r.RequestID,
-		r.AcsUrl,
-		nowStr,
-		StatusCodeAuthNFailed,
-		message,
-		r.Issuer,
-	)
-}
-
-func (r *Response) makeSuccessfulResponse(
+func (r *Response) MakeSuccessfulResponse(
 	attributes *Attributes,
 	timeFormat string,
 ) *samlp.ResponseType {
@@ -199,7 +145,7 @@ func getIssuer(entityID string) *saml.NameIDType {
 	}
 }
 
-func makeAttributeQueryResponse(
+func MakeAttributeQueryResponse(
 	requestID string,
 	issuer string,
 	entityID string,
