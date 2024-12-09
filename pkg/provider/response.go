@@ -164,7 +164,7 @@ func getIssuer(entityID string) *saml.NameIDType {
 	}
 }
 
-func MakeAttributeQueryResponse(
+func makeAttributeQueryResponse(
 	requestID string,
 	issuer string,
 	entityID string,
