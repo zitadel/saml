@@ -128,7 +128,7 @@ func (p *IdentityProvider) attributeQueryHandleFunc(w http.ResponseWriter, r *ht
 					queriedAttrs = append(queriedAttrs, queriedAttr)
 				}
 			}
-			response = makeAttributeQueryResponse(attrQuery.Id, p.GetEntityID(r.Context()), sp.GetEntityID(), attrs, queriedAttrs, p.timeFormat)
+			response = MakeAttributeQueryResponse(attrQuery.Id, p.GetEntityID(r.Context()), sp.GetEntityID(), attrs, queriedAttrs, p.TimeFormat)
 			return nil
 		},
 		func() {
@@ -139,7 +139,11 @@ func (p *IdentityProvider) attributeQueryHandleFunc(w http.ResponseWriter, r *ht
 	// create enveloped signature
 	checkerInstance.WithLogicStep(
 		func() error {
-			return createPostSignature(r.Context(), response, p)
+			cert, key, err := getResponseCert(r.Context(), p.storage)
+			if err != nil {
+				return err
+			}
+			return createPostSignature(response, key, cert, p.conf.SignatureAlgorithm)
 		},
 		func() {
 			http.Error(w, fmt.Errorf("failed to sign response: %w", err).Error(), http.StatusInternalServerError)

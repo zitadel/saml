@@ -68,7 +68,8 @@ type IdentityProvider struct {
 	metadataEndpoint *Endpoint
 	endpoints        *Endpoints
 
-	timeFormat string
+	TimeFormat string
+	Expiration time.Duration
 }
 
 type Endpoints struct {
@@ -97,7 +98,8 @@ func NewIdentityProvider(metadata Endpoint, conf *IdentityProviderConfig, storag
 		postTemplate:     postTemplate,
 		logoutTemplate:   logoutTemplate,
 		endpoints:        endpointConfigToEndpoints(conf.Endpoints),
-		timeFormat:       DefaultTimeFormat,
+		TimeFormat:       DefaultTimeFormat,
+		Expiration:       DefaultExpiration,
 	}
 
 	if conf.MetadataIDPConfig == nil {
@@ -153,7 +155,7 @@ func (p *IdentityProvider) GetMetadata(ctx context.Context) (*md.IDPSSODescripto
 		return nil, nil, err
 	}
 
-	metadata, aaMetadata := p.conf.getMetadata(ctx, p.GetEntityID(ctx), cert, p.timeFormat)
+	metadata, aaMetadata := p.conf.getMetadata(ctx, p.GetEntityID(ctx), cert, p.TimeFormat)
 	return metadata, aaMetadata, nil
 }
 

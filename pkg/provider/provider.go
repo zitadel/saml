@@ -5,20 +5,23 @@ import (
 	"crypto/rsa"
 	"fmt"
 	"net/http"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/gorilla/handlers"
 	"github.com/gorilla/mux"
 
+	"github.com/zitadel/saml/pkg/provider/models"
 	"github.com/zitadel/saml/pkg/provider/signature"
 	"github.com/zitadel/saml/pkg/provider/xml/md"
+	"github.com/zitadel/saml/pkg/provider/xml/samlp"
 )
 
 const (
 	DefaultTimeFormat       = "2006-01-02T15:04:05.999999Z"
+	DefaultExpiration       = 5 * time.Minute
 	PostBinding             = "urn:oasis:names:tc:SAML:2.0:bindings:HTTP-POST"
 	RedirectBinding         = "urn:oasis:names:tc:SAML:2.0:bindings:HTTP-Redirect"
-	SOAPBinding             = "urn:oasis:names:tc:SAML:2.0:bindings:SOAP"
 	DefaultMetadataEndpoint = "/metadata"
 )
 
@@ -80,7 +83,6 @@ type Provider struct {
 	conf              *Config
 	issuerFromRequest IssuerFromRequest
 	identityProvider  *IdentityProvider
-	timeFormat        string
 }
 
 func NewProvider(
@@ -217,10 +219,30 @@ var allowAllOrigins = func(_ string) bool {
 }
 
 // AuthCallbackURL builds the url for the redirect (with the requestID) after a successful login
-func AuthCallbackURL(p *Provider) func(context.Context, string) string {
+func (p *Provider) AuthCallbackURL() func(context.Context, string) string {
 	return func(ctx context.Context, requestID string) string {
 		return p.identityProvider.endpoints.callbackEndpoint.Absolute(IssuerFromContext(ctx)) + "?id=" + requestID
 	}
+}
+
+// AuthCallbackResponse returns the SAMLResponse from as successful SAMLRequest
+func (p *Provider) AuthCallbackResponse(ctx context.Context, authRequest models.AuthRequestInt, response *Response) (*samlp.ResponseType, error) {
+	return p.identityProvider.loginResponse(ctx, authRequest, response)
+}
+
+// AuthCallbackErrorResponse returns the SAMLResponse from as failed SAMLRequest
+func (p *Provider) AuthCallbackErrorResponse(response *Response, reason, description string) *samlp.ResponseType {
+	return p.identityProvider.errorResponse(response, reason, description)
+}
+
+// Timeformat return the used timeformat in messages
+func (p *Provider) Timeformat() string {
+	return p.identityProvider.TimeFormat
+}
+
+// Expiration return the used expiration in messages
+func (p *Provider) Expiration() time.Duration {
+	return p.identityProvider.Expiration
 }
 
 func intercept(i IssuerFromRequest, interceptors ...HttpInterceptor) func(handler http.Handler) http.Handler {
@@ -250,7 +272,7 @@ func WithAllowInsecure() Option {
 // WithCustomTimeFormat allows the use of a custom timeformat instead of the default
 func WithCustomTimeFormat(timeFormat string) Option {
 	return func(p *Provider) error {
-		p.identityProvider.timeFormat = timeFormat
+		p.identityProvider.TimeFormat = timeFormat
 		return nil
 	}
 }

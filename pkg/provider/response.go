@@ -1,6 +1,7 @@
 package provider
 
 import (
+	"crypto/rsa"
 	"encoding/base64"
 	"fmt"
 	"html/template"
@@ -40,7 +41,7 @@ type Response struct {
 	SendIP    string
 }
 
-type AuthResponseForm struct {
+type authResponseForm struct {
 	RelayState                  string
 	SAMLResponse                string
 	AssertionConsumerServiceURL string
@@ -69,7 +70,7 @@ func (r *Response) sendBackResponse(
 	case PostBinding:
 		respData := base64.StdEncoding.EncodeToString(respData)
 
-		data := AuthResponseForm{
+		data := authResponseForm{
 			r.RelayState,
 			respData,
 			r.AcsUrl,
@@ -86,14 +87,31 @@ func (r *Response) sendBackResponse(
 			return
 		}
 
-		http.Redirect(w, req, fmt.Sprintf("%s?%s", r.AcsUrl, buildRedirectQuery(string(respData), r.RelayState, r.SigAlg, r.Signature)), http.StatusFound)
+		http.Redirect(w, req, fmt.Sprintf("%s?%s", r.AcsUrl, BuildRedirectQuery(string(respData), r.RelayState, r.SigAlg, r.Signature)), http.StatusFound)
 		return
 	default:
 		//TODO: no binding
 	}
 }
 
-func (r *Response) MakeFailedResponse(
+func createSignature(response *Response, samlResponse *samlp.ResponseType, key *rsa.PrivateKey, cert []byte, signatureAlgorithm string) error {
+	switch response.ProtocolBinding {
+	case PostBinding:
+		if err := createPostSignature(samlResponse, key, cert, signatureAlgorithm); err != nil {
+			return fmt.Errorf("failed to sign response: %w", err)
+		}
+	case RedirectBinding:
+		sig, sigAlg, err := createRedirectSignature(samlResponse, key, cert, signatureAlgorithm, response.RelayState)
+		if err != nil {
+			return fmt.Errorf("failed to sign response: %w", err)
+		}
+		response.Signature = sig
+		response.SigAlg = sigAlg
+	}
+	return nil
+}
+
+func (r *Response) makeFailedResponse(
 	reason string,
 	message string,
 	timeFormat string,
@@ -111,13 +129,14 @@ func (r *Response) MakeFailedResponse(
 	)
 }
 
-func (r *Response) MakeSuccessfulResponse(
+func (r *Response) makeSuccessfulResponse(
 	attributes *Attributes,
 	timeFormat string,
+	expiration time.Duration,
 ) *samlp.ResponseType {
 	now := time.Now().UTC()
 	nowStr := now.Format(timeFormat)
-	fiveFromNowStr := now.Add(5 * time.Minute).Format(timeFormat)
+	fiveFromNowStr := now.Add(expiration).Format(timeFormat)
 
 	return r.makeAssertionResponse(
 		nowStr,

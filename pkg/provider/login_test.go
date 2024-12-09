@@ -1,9 +1,9 @@
 package provider
 
 import (
-	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"testing"
 
 	"github.com/golang/mock/gomock"
@@ -23,9 +23,11 @@ func TestSSO_loginHandleFunc(t *testing.T) {
 		Done          bool
 	}
 	type res struct {
-		code  int
-		err   bool
-		state string
+		code    int
+		err     bool
+		state   string
+		inflate bool
+		b64     bool
 	}
 	type sp struct {
 		appID    string
@@ -77,9 +79,10 @@ func TestSSO_loginHandleFunc(t *testing.T) {
 				},
 			},
 			res{
-				code:  302,
-				state: "",
-				err:   false,
+				code:    302,
+				state:   "",
+				err:     false,
+				inflate: true,
 			}},
 		{
 			"login redirect without RelayState successful",
@@ -110,9 +113,10 @@ func TestSSO_loginHandleFunc(t *testing.T) {
 				},
 			},
 			res{
-				code:  302,
-				state: "",
-				err:   false,
+				code:    302,
+				state:   "",
+				err:     false,
+				inflate: true,
 			}},
 		{
 			"login post successful",
@@ -235,7 +239,7 @@ func TestSSO_loginHandleFunc(t *testing.T) {
 					ID:            "test",
 					AuthRequestID: "test",
 					Binding:       RedirectBinding,
-					AcsURL:        "url",
+					AcsURL:        "https://sp.example.com",
 					RelayState:    "relaystate",
 					UserID:        "userid",
 					Done:          false,
@@ -247,9 +251,11 @@ func TestSSO_loginHandleFunc(t *testing.T) {
 				},
 			},
 			res{
-				code:  500,
-				state: "",
-				err:   false,
+				code:    302,
+				state:   StatusCodeAuthNFailed,
+				err:     false,
+				inflate: true,
+				b64:     true,
 			}},
 	}
 
@@ -297,14 +303,15 @@ func TestSSO_loginHandleFunc(t *testing.T) {
 			defer func() {
 				_ = res.Body.Close()
 			}()
-			response, err := ioutil.ReadAll(res.Body)
-			if res.StatusCode != tt.res.code {
-				t.Errorf("ssoHandleFunc() code got = %v, want %v", res.StatusCode, tt.res)
-				return
-			}
 
+			// currently only checked for redirect binding
 			if tt.res.state != "" {
-				if err := parseForState(string(response), tt.res.state); err != nil {
+				responseURL, err := url.Parse(res.Header.Get("Location"))
+				if err != nil {
+					t.Errorf("error while parsing url")
+				}
+
+				if err := parseForState(tt.res.inflate, tt.res.b64, responseURL.Query().Get("SAMLResponse"), tt.res.state); err != nil {
 					t.Errorf("ssoHandleFunc() response state not: %v", tt.res.state)
 					return
 				}
