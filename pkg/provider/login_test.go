@@ -79,10 +79,9 @@ func TestSSO_loginHandleFunc(t *testing.T) {
 				},
 			},
 			res{
-				code:    302,
-				state:   "",
-				err:     false,
-				inflate: true,
+				code:  302,
+				state: "",
+				err:   false,
 			}},
 		{
 			"login redirect without RelayState successful",
@@ -113,10 +112,9 @@ func TestSSO_loginHandleFunc(t *testing.T) {
 				},
 			},
 			res{
-				code:    302,
-				state:   "",
-				err:     false,
-				inflate: true,
+				code:  302,
+				state: "",
+				err:   false,
 			}},
 		{
 			"login post successful",

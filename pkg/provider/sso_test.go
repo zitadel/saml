@@ -621,9 +621,8 @@ func TestSSO_ssoHandleFunc(t *testing.T) {
 				},
 			},
 			res{
-				code:    303,
-				err:     false,
-				inflate: false,
+				code: 303,
+				err:  false,
 			}},
 	}
 	for _, tt := range tests {
