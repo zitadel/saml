@@ -3,6 +3,7 @@ package provider
 import (
 	"crypto/rsa"
 	"encoding/base64"
+	"errors"
 	"fmt"
 	"html/template"
 	"net/http"
@@ -13,17 +14,17 @@ import (
 	"github.com/zitadel/saml/pkg/provider/xml/samlp"
 )
 
-const (
-	StatusCodeSuccess                = "urn:oasis:names:tc:SAML:2.0:status:Success"
-	StatusCodeVersionMissmatch       = "urn:oasis:names:tc:SAML:2.0:status:VersionMismatch"
-	StatusCodeAuthNFailed            = "urn:oasis:names:tc:SAML:2.0:status:AuthnFailed"
-	StatusCodeInvalidAttrNameOrValue = "urn:oasis:names:tc:SAML:2.0:status:InvalidAttrNameOrValue"
-	StatusCodeInvalidNameIDPolicy    = "urn:oasis:names:tc:SAML:2.0:status:InvalidNameIDPolicy"
-	StatusCodeRequestDenied          = "urn:oasis:names:tc:SAML:2.0:status:RequestDenied"
-	StatusCodeRequestUnsupported     = "urn:oasis:names:tc:SAML:2.0:status:RequestUnsupported"
-	StatusCodeUnsupportedBinding     = "urn:oasis:names:tc:SAML:2.0:status:UnsupportedBinding"
-	StatusCodeResponder              = "urn:oasis:names:tc:SAML:2.0:status:Responder"
-	StatusCodePartialLogout          = "urn:oasis:names:tc:SAML:2.0:status:PartialLogout"
+var (
+	statusCodeSuccess                = errors.New("urn:oasis:names:tc:SAML:2.0:status:Success")
+	StatusCodeVersionMissmatch       = errors.New("urn:oasis:names:tc:SAML:2.0:status:VersionMismatch")
+	StatusCodeAuthNFailed            = errors.New("urn:oasis:names:tc:SAML:2.0:status:AuthnFailed")
+	StatusCodeInvalidAttrNameOrValue = errors.New("urn:oasis:names:tc:SAML:2.0:status:InvalidAttrNameOrValue")
+	StatusCodeInvalidNameIDPolicy    = errors.New("urn:oasis:names:tc:SAML:2.0:status:InvalidNameIDPolicy")
+	StatusCodeRequestDenied          = errors.New("urn:oasis:names:tc:SAML:2.0:status:RequestDenied")
+	StatusCodeRequestUnsupported     = errors.New("urn:oasis:names:tc:SAML:2.0:status:RequestUnsupported")
+	StatusCodeUnsupportedBinding     = errors.New("urn:oasis:names:tc:SAML:2.0:status:UnsupportedBinding")
+	StatusCodeResponder              = errors.New("urn:oasis:names:tc:SAML:2.0:status:Responder")
+	StatusCodePartialLogout          = errors.New("urn:oasis:names:tc:SAML:2.0:status:PartialLogout")
 )
 
 type Response struct {
@@ -112,7 +113,7 @@ func createSignature(response *Response, samlResponse *samlp.ResponseType, key *
 }
 
 func (r *Response) makeFailedResponse(
-	reason string,
+	reason error,
 	message string,
 	timeFormat string,
 ) *samlp.ResponseType {
@@ -123,7 +124,7 @@ func (r *Response) makeFailedResponse(
 		r.RequestID,
 		r.AcsUrl,
 		nowStr,
-		reason,
+		reason.Error(),
 		message,
 		r.Issuer,
 	)
@@ -151,7 +152,7 @@ func (r *Response) makeAssertionResponse(
 	attributes *Attributes,
 ) *samlp.ResponseType {
 
-	response := makeResponse(NewID(), r.RequestID, r.AcsUrl, issueInstant, StatusCodeSuccess, "", r.Issuer)
+	response := makeResponse(NewID(), r.RequestID, r.AcsUrl, issueInstant, statusCodeSuccess.Error(), "", r.Issuer)
 	assertion := makeAssertion(r.RequestID, r.AcsUrl, r.SendIP, issueInstant, untilInstant, r.Issuer, attributes.GetNameID(), attributes.GetSAML(), r.Audience, true)
 	response.Assertion = *assertion
 	return response
@@ -194,7 +195,7 @@ func makeAttributeQueryResponse(
 		}
 	}
 
-	response := makeResponse(NewID(), requestID, "", nowStr, StatusCodeSuccess, "", issuer)
+	response := makeResponse(NewID(), requestID, "", nowStr, statusCodeSuccess.Error(), "", issuer)
 	assertion := makeAssertion(requestID, "", "", nowStr, fiveFromNowStr, issuer, attributes.GetNameID(), providedAttrs, entityID, false)
 	response.Assertion = *assertion
 	return response

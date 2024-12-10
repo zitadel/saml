@@ -55,55 +55,28 @@ func (r *LogoutResponse) sendBackLogoutResponse(w http.ResponseWriter, resp *sam
 	}
 }
 
+func (r *LogoutResponse) makeFailedLogoutResponse(
+	reason error,
+	message string,
+	timeFormat string,
+) *samlp.LogoutResponseType {
+	return makeLogoutResponse(
+		r.RequestID,
+		r.LogoutURL,
+		time.Now().UTC().Format(timeFormat),
+		reason.Error(),
+		message,
+		getIssuer(r.Issuer),
+	)
+}
+
 func (r *LogoutResponse) makeSuccessfulLogoutResponse(timeFormat string) *samlp.LogoutResponseType {
 	return makeLogoutResponse(
 		r.RequestID,
 		r.LogoutURL,
 		time.Now().UTC().Format(timeFormat),
-		StatusCodeSuccess,
+		statusCodeSuccess.Error(),
 		"",
-		getIssuer(r.Issuer),
-	)
-}
-
-func (r *LogoutResponse) makeUnsupportedlLogoutResponse(
-	message string,
-	timeFormat string,
-) *samlp.LogoutResponseType {
-	return makeLogoutResponse(
-		r.RequestID,
-		r.LogoutURL,
-		time.Now().UTC().Format(timeFormat),
-		StatusCodeRequestUnsupported,
-		message,
-		getIssuer(r.Issuer),
-	)
-}
-
-func (r *LogoutResponse) makePartialLogoutResponse(
-	message string,
-	timeFormat string,
-) *samlp.LogoutResponseType {
-	return makeLogoutResponse(
-		r.RequestID,
-		r.LogoutURL,
-		time.Now().UTC().Format(timeFormat),
-		StatusCodePartialLogout,
-		message,
-		getIssuer(r.Issuer),
-	)
-}
-
-func (r *LogoutResponse) makeDeniedLogoutResponse(
-	message string,
-	timeFormat string,
-) *samlp.LogoutResponseType {
-	return makeLogoutResponse(
-		r.RequestID,
-		r.LogoutURL,
-		time.Now().UTC().Format(timeFormat),
-		StatusCodeRequestDenied,
-		message,
 		getIssuer(r.Issuer),
 	)
 }

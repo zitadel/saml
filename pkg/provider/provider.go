@@ -231,7 +231,7 @@ func (p *Provider) AuthCallbackResponse(ctx context.Context, authRequest models.
 }
 
 // AuthCallbackErrorResponse returns the SAMLResponse from as failed SAMLRequest
-func (p *Provider) AuthCallbackErrorResponse(response *Response, reason, description string) *samlp.ResponseType {
+func (p *Provider) AuthCallbackErrorResponse(response *Response, reason error, description string) *samlp.ResponseType {
 	return p.identityProvider.errorResponse(response, reason, description)
 }
 
