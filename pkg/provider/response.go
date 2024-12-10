@@ -3,7 +3,6 @@ package provider
 import (
 	"crypto/rsa"
 	"encoding/base64"
-	"errors"
 	"fmt"
 	"html/template"
 	"net/http"
@@ -15,16 +14,16 @@ import (
 )
 
 var (
-	statusCodeSuccess                = errors.New("urn:oasis:names:tc:SAML:2.0:status:Success")
-	StatusCodeVersionMissmatch       = errors.New("urn:oasis:names:tc:SAML:2.0:status:VersionMismatch")
-	StatusCodeAuthNFailed            = errors.New("urn:oasis:names:tc:SAML:2.0:status:AuthnFailed")
-	StatusCodeInvalidAttrNameOrValue = errors.New("urn:oasis:names:tc:SAML:2.0:status:InvalidAttrNameOrValue")
-	StatusCodeInvalidNameIDPolicy    = errors.New("urn:oasis:names:tc:SAML:2.0:status:InvalidNameIDPolicy")
-	StatusCodeRequestDenied          = errors.New("urn:oasis:names:tc:SAML:2.0:status:RequestDenied")
-	StatusCodeRequestUnsupported     = errors.New("urn:oasis:names:tc:SAML:2.0:status:RequestUnsupported")
-	StatusCodeUnsupportedBinding     = errors.New("urn:oasis:names:tc:SAML:2.0:status:UnsupportedBinding")
-	StatusCodeResponder              = errors.New("urn:oasis:names:tc:SAML:2.0:status:Responder")
-	StatusCodePartialLogout          = errors.New("urn:oasis:names:tc:SAML:2.0:status:PartialLogout")
+	StatusCodeSuccess                = "urn:oasis:names:tc:SAML:2.0:status:Success"
+	StatusCodeVersionMissmatch       = "urn:oasis:names:tc:SAML:2.0:status:VersionMismatch"
+	StatusCodeAuthNFailed            = "urn:oasis:names:tc:SAML:2.0:status:AuthnFailed"
+	StatusCodeInvalidAttrNameOrValue = "urn:oasis:names:tc:SAML:2.0:status:InvalidAttrNameOrValue"
+	StatusCodeInvalidNameIDPolicy    = "urn:oasis:names:tc:SAML:2.0:status:InvalidNameIDPolicy"
+	StatusCodeRequestDenied          = "urn:oasis:names:tc:SAML:2.0:status:RequestDenied"
+	StatusCodeRequestUnsupported     = "urn:oasis:names:tc:SAML:2.0:status:RequestUnsupported"
+	StatusCodeUnsupportedBinding     = "urn:oasis:names:tc:SAML:2.0:status:UnsupportedBinding"
+	StatusCodeResponder              = "urn:oasis:names:tc:SAML:2.0:status:Responder"
+	StatusCodePartialLogout          = "urn:oasis:names:tc:SAML:2.0:status:PartialLogout"
 )
 
 type Response struct {
@@ -113,18 +112,17 @@ func createSignature(response *Response, samlResponse *samlp.ResponseType, key *
 }
 
 func (r *Response) makeFailedResponse(
-	reason error,
+	reason string,
 	message string,
 	timeFormat string,
 ) *samlp.ResponseType {
 	now := time.Now().UTC()
-	nowStr := now.Format(timeFormat)
 	return makeResponse(
 		NewID(),
 		r.RequestID,
 		r.AcsUrl,
-		nowStr,
-		reason.Error(),
+		now.Format(timeFormat),
+		reason,
 		message,
 		r.Issuer,
 	)
@@ -136,12 +134,9 @@ func (r *Response) makeSuccessfulResponse(
 	expiration time.Duration,
 ) *samlp.ResponseType {
 	now := time.Now().UTC()
-	nowStr := now.Format(timeFormat)
-	fiveFromNowStr := now.Add(expiration).Format(timeFormat)
-
 	return r.makeAssertionResponse(
-		nowStr,
-		fiveFromNowStr,
+		now.Format(timeFormat),
+		now.Add(expiration).Format(timeFormat),
 		attributes,
 	)
 }
@@ -152,7 +147,7 @@ func (r *Response) makeAssertionResponse(
 	attributes *Attributes,
 ) *samlp.ResponseType {
 
-	response := makeResponse(NewID(), r.RequestID, r.AcsUrl, issueInstant, statusCodeSuccess.Error(), "", r.Issuer)
+	response := makeResponse(NewID(), r.RequestID, r.AcsUrl, issueInstant, StatusCodeSuccess, "", r.Issuer)
 	assertion := makeAssertion(r.RequestID, r.AcsUrl, r.SendIP, issueInstant, untilInstant, r.Issuer, attributes.GetNameID(), attributes.GetSAML(), r.Audience, true)
 	response.Assertion = *assertion
 	return response
@@ -172,13 +167,9 @@ func makeAttributeQueryResponse(
 	attributes *Attributes,
 	queriedAttrs []saml.AttributeType,
 	timeFormat string,
+	expiration time.Duration,
 ) *samlp.ResponseType {
 	now := time.Now().UTC()
-	nowStr := now.Format(timeFormat)
-	fiveMinutes, _ := time.ParseDuration("5m")
-	fiveFromNow := now.Add(fiveMinutes)
-	fiveFromNowStr := fiveFromNow.Format(timeFormat)
-
 	providedAttrs := []*saml.AttributeType{}
 	attrsSaml := attributes.GetSAML()
 	if queriedAttrs == nil || len(queriedAttrs) == 0 {
@@ -195,8 +186,8 @@ func makeAttributeQueryResponse(
 		}
 	}
 
-	response := makeResponse(NewID(), requestID, "", nowStr, statusCodeSuccess.Error(), "", issuer)
-	assertion := makeAssertion(requestID, "", "", nowStr, fiveFromNowStr, issuer, attributes.GetNameID(), providedAttrs, entityID, false)
+	response := makeResponse(NewID(), requestID, "", now.Format(timeFormat), StatusCodeSuccess, "", issuer)
+	assertion := makeAssertion(requestID, "", "", now.Format(timeFormat), now.Add(expiration).Format(timeFormat), issuer, attributes.GetNameID(), providedAttrs, entityID, false)
 	response.Assertion = *assertion
 	return response
 }

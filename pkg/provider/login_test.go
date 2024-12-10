@@ -250,7 +250,7 @@ func TestSSO_loginHandleFunc(t *testing.T) {
 			},
 			res{
 				code:    302,
-				state:   StatusCodeAuthNFailed.Error(),
+				state:   StatusCodeAuthNFailed,
 				err:     false,
 				inflate: true,
 				b64:     true,

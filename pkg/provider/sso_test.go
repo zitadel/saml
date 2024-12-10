@@ -525,7 +525,7 @@ func TestSSO_ssoHandleFunc(t *testing.T) {
 			},
 			res{
 				code:  200,
-				state: StatusCodeRequestDenied.Error(),
+				state: StatusCodeRequestDenied,
 				err:   false,
 			}},
 		{
@@ -557,7 +557,7 @@ func TestSSO_ssoHandleFunc(t *testing.T) {
 			},
 			res{
 				code:  200,
-				state: StatusCodeRequestDenied.Error(),
+				state: StatusCodeRequestDenied,
 				err:   false,
 			}},
 		{
@@ -590,7 +590,7 @@ func TestSSO_ssoHandleFunc(t *testing.T) {
 			},
 			res{
 				code:  200,
-				state: StatusCodeRequestDenied.Error(),
+				state: StatusCodeRequestDenied,
 				err:   false,
 			}},
 		{

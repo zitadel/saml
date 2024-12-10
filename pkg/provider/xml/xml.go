@@ -44,19 +44,19 @@ func Marshal(data interface{}) ([]byte, error) {
 }
 
 func DeflateAndBase64(data []byte) ([]byte, error) {
-	w := &bytes.Buffer{}
-	w1 := base64.NewEncoder(base64.StdEncoding, w)
-	w2, _ := flate.NewWriter(w1, 9)
-	if _, err := w2.Write(data); err != nil {
+	buff := &bytes.Buffer{}
+	b64Encoder := base64.NewEncoder(base64.StdEncoding, buff)
+	flateWriter, _ := flate.NewWriter(b64Encoder, 9)
+	if _, err := flateWriter.Write(data); err != nil {
 		return nil, err
 	}
-	if err := w2.Close(); err != nil {
+	if err := flateWriter.Close(); err != nil {
 		return nil, err
 	}
-	if err := w1.Close(); err != nil {
+	if err := b64Encoder.Close(); err != nil {
 		return nil, err
 	}
-	return w.Bytes(), nil
+	return buff.Bytes(), nil
 }
 
 func WriteXMLMarshalled(w http.ResponseWriter, body interface{}) error {
@@ -87,7 +87,6 @@ func DecodeAuthNRequest(encoding string, message string) (*samlp.AuthnRequestTyp
 	}
 	req := &samlp.AuthnRequestType{}
 	if err := xml.Unmarshal(data, req); err != nil {
-		fmt.Println(err.Error())
 		return nil, err
 	}
 	return req, nil
@@ -100,7 +99,6 @@ func DecodeSignature(encoding string, b64 bool, message string) (*xml_dsig.Signa
 	}
 	ret := &xml_dsig.SignatureType{}
 	if err := xml.Unmarshal(data, ret); err != nil {
-		fmt.Println(err.Error())
 		return nil, err
 	}
 	return ret, nil
@@ -124,7 +122,6 @@ func DecodeLogoutRequest(encoding string, message string) (*samlp.LogoutRequestT
 	}
 	req := &samlp.LogoutRequestType{}
 	if err := xml.Unmarshal(data, req); err != nil {
-		fmt.Println(err.Error())
 		return nil, err
 	}
 	return req, nil
@@ -137,7 +134,6 @@ func DecodeResponse(encoding string, b64 bool, message string) (*samlp.ResponseT
 	}
 	req := &samlp.ResponseType{}
 	if err := xml.Unmarshal(data, req); err != nil {
-		fmt.Println(err.Error())
 		return nil, err
 	}
 	return req, nil
@@ -156,12 +152,9 @@ func InflateAndDecode(encoding string, b64 bool, message string) (_ []byte, err 
 		return data, nil
 	case EncodingDeflate:
 		r := flate.NewReader(bytes.NewBuffer(data))
-		out, err := io.ReadAll(r)
-		if err != nil {
-			return nil, err
-		}
-		r.Close()
-		return out, nil
+		defer r.Close()
+		return io.ReadAll(r)
+	default:
+		return nil, fmt.Errorf("unknown encoding")
 	}
-	return nil, fmt.Errorf("unknown encoding")
 }

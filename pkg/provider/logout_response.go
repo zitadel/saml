@@ -56,7 +56,7 @@ func (r *LogoutResponse) sendBackLogoutResponse(w http.ResponseWriter, resp *sam
 }
 
 func (r *LogoutResponse) makeFailedLogoutResponse(
-	reason error,
+	reason string,
 	message string,
 	timeFormat string,
 ) *samlp.LogoutResponseType {
@@ -64,7 +64,7 @@ func (r *LogoutResponse) makeFailedLogoutResponse(
 		r.RequestID,
 		r.LogoutURL,
 		time.Now().UTC().Format(timeFormat),
-		reason.Error(),
+		reason,
 		message,
 		getIssuer(r.Issuer),
 	)
@@ -75,7 +75,7 @@ func (r *LogoutResponse) makeSuccessfulLogoutResponse(timeFormat string) *samlp.
 		r.RequestID,
 		r.LogoutURL,
 		time.Now().UTC().Format(timeFormat),
-		statusCodeSuccess.Error(),
+		StatusCodeSuccess,
 		"",
 		getIssuer(r.Issuer),
 	)
