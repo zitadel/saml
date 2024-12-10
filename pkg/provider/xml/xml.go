@@ -46,6 +46,7 @@ func Marshal(data interface{}) ([]byte, error) {
 func DeflateAndBase64(data []byte) ([]byte, error) {
 	buff := &bytes.Buffer{}
 	b64Encoder := base64.NewEncoder(base64.StdEncoding, buff)
+	// compression level is set at 9 as BestCompression, also used by other SAML application like crewjam/saml
 	flateWriter, _ := flate.NewWriter(b64Encoder, 9)
 	if _, err := flateWriter.Write(data); err != nil {
 		return nil, err
