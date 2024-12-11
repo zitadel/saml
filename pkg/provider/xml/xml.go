@@ -7,6 +7,7 @@ import (
 	"encoding/base64"
 	"encoding/xml"
 	"fmt"
+	"io"
 	"net/http"
 	"strings"
 
@@ -43,25 +44,20 @@ func Marshal(data interface{}) ([]byte, error) {
 }
 
 func DeflateAndBase64(data []byte) ([]byte, error) {
-	b := &bytes.Buffer{}
-	w1 := base64.NewEncoder(base64.StdEncoding, b)
-	defer w1.Close()
-
-	w2, _ := flate.NewWriter(w1, 1)
-	defer w2.Close()
-
-	bw := bufio.NewWriter(w1)
-	if _, err := bw.Write(data); err != nil {
+	buff := &bytes.Buffer{}
+	b64Encoder := base64.NewEncoder(base64.StdEncoding, buff)
+	// compression level is set at 9 as BestCompression, also used by other SAML application like crewjam/saml
+	flateWriter, _ := flate.NewWriter(b64Encoder, 9)
+	if _, err := flateWriter.Write(data); err != nil {
 		return nil, err
 	}
-	if err := bw.Flush(); err != nil {
+	if err := flateWriter.Close(); err != nil {
 		return nil, err
 	}
-
-	if err := w2.Flush(); err != nil {
+	if err := b64Encoder.Close(); err != nil {
 		return nil, err
 	}
-	return b.Bytes(), nil
+	return buff.Bytes(), nil
 }
 
 func WriteXMLMarshalled(w http.ResponseWriter, body interface{}) error {
@@ -86,53 +82,26 @@ func Write(w http.ResponseWriter, body []byte) error {
 }
 
 func DecodeAuthNRequest(encoding string, message string) (*samlp.AuthnRequestType, error) {
-	reqBytes, err := base64.StdEncoding.DecodeString(message)
+	data, err := InflateAndDecode(encoding, true, message)
 	if err != nil {
-		return nil, fmt.Errorf("failed to base64 decode: %w", err)
+		return nil, err
 	}
-
 	req := &samlp.AuthnRequestType{}
-	switch encoding {
-	case EncodingDeflate:
-		reader := flate.NewReader(bytes.NewReader(reqBytes))
-		decoder := xml.NewDecoder(reader)
-		if err = decoder.Decode(req); err != nil {
-			return nil, fmt.Errorf("failed to defalte decode: %w", err)
-		}
-	default:
-		reader := flate.NewReader(bytes.NewReader(reqBytes))
-		decoder := xml.NewDecoder(reader)
-		if err = decoder.Decode(req); err != nil {
-			if err := xml.Unmarshal(reqBytes, req); err != nil {
-				return nil, fmt.Errorf("failed to unmarshal: %w", err)
-			}
-		}
+	if err := xml.Unmarshal(data, req); err != nil {
+		return nil, err
 	}
-
 	return req, nil
 }
 
-func DecodeSignature(encoding string, message string) (*xml_dsig.SignatureType, error) {
-	retBytes := []byte(message)
-
-	ret := &xml_dsig.SignatureType{}
-	switch encoding {
-	case EncodingDeflate:
-		reader := flate.NewReader(bytes.NewReader(retBytes))
-		decoder := xml.NewDecoder(reader)
-		if err := decoder.Decode(ret); err != nil {
-			return nil, fmt.Errorf("failed to defalte decode: %w", err)
-		}
-	default:
-		reader := flate.NewReader(bytes.NewReader(retBytes))
-		decoder := xml.NewDecoder(reader)
-		if err := decoder.Decode(ret); err != nil {
-			if err := xml.Unmarshal(retBytes, ret); err != nil {
-				return nil, fmt.Errorf("failed to unmarshal: %w", err)
-			}
-		}
+func DecodeSignature(encoding string, b64 bool, message string) (*xml_dsig.SignatureType, error) {
+	data, err := InflateAndDecode(encoding, b64, message)
+	if err != nil {
+		return nil, err
 	}
-
+	ret := &xml_dsig.SignatureType{}
+	if err := xml.Unmarshal(data, ret); err != nil {
+		return nil, err
+	}
 	return ret, nil
 }
 
@@ -148,50 +117,45 @@ func DecodeAttributeQuery(request string) (*samlp.AttributeQueryType, error) {
 }
 
 func DecodeLogoutRequest(encoding string, message string) (*samlp.LogoutRequestType, error) {
-	reqBytes, err := base64.StdEncoding.DecodeString(message)
+	data, err := InflateAndDecode(encoding, true, message)
 	if err != nil {
 		return nil, err
 	}
-
 	req := &samlp.LogoutRequestType{}
-	switch encoding {
-	case "":
-		reader := flate.NewReader(bytes.NewReader(reqBytes))
-		decoder := xml.NewDecoder(reader)
-		if err = decoder.Decode(req); err != nil {
-			return nil, err
-		}
-	case EncodingDeflate:
-		reader := flate.NewReader(bytes.NewReader(reqBytes))
-		decoder := xml.NewDecoder(reader)
-		if err = decoder.Decode(req); err != nil {
-			return nil, err
-		}
-	default:
-		return nil, fmt.Errorf("unknown encoding")
+	if err := xml.Unmarshal(data, req); err != nil {
+		return nil, err
 	}
-
 	return req, nil
 }
 
-func DecodeResponse(encoding string, message string) (*samlp.ResponseType, error) {
-
+func DecodeResponse(encoding string, b64 bool, message string) (*samlp.ResponseType, error) {
+	data, err := InflateAndDecode(encoding, b64, message)
+	if err != nil {
+		return nil, err
+	}
 	req := &samlp.ResponseType{}
+	if err := xml.Unmarshal(data, req); err != nil {
+		return nil, err
+	}
+	return req, nil
+}
+
+func InflateAndDecode(encoding string, b64 bool, message string) (_ []byte, err error) {
+	data := []byte(message)
+	if b64 {
+		data, err = base64.StdEncoding.DecodeString(message)
+		if err != nil {
+			return nil, err
+		}
+	}
 	switch encoding {
 	case "":
-		decoder := xml.NewDecoder(bytes.NewReader([]byte(message)))
-		if err := decoder.Decode(req); err != nil {
-			return nil, err
-		}
+		return data, nil
 	case EncodingDeflate:
-		reader := flate.NewReader(bytes.NewReader([]byte(message)))
-		decoder := xml.NewDecoder(reader)
-		if err := decoder.Decode(req); err != nil {
-			return nil, err
-		}
+		r := flate.NewReader(bytes.NewBuffer(data))
+		defer r.Close()
+		return io.ReadAll(r)
 	default:
 		return nil, fmt.Errorf("unknown encoding")
 	}
-
-	return req, nil
 }

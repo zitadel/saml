@@ -1,6 +1,7 @@
 package provider
 
 import (
+	"crypto/rsa"
 	"encoding/base64"
 	"fmt"
 	"html/template"
@@ -12,7 +13,7 @@ import (
 	"github.com/zitadel/saml/pkg/provider/xml/samlp"
 )
 
-const (
+var (
 	StatusCodeSuccess                = "urn:oasis:names:tc:SAML:2.0:status:Success"
 	StatusCodeVersionMissmatch       = "urn:oasis:names:tc:SAML:2.0:status:VersionMismatch"
 	StatusCodeAuthNFailed            = "urn:oasis:names:tc:SAML:2.0:status:AuthnFailed"
@@ -40,11 +41,7 @@ type Response struct {
 	SendIP    string
 }
 
-func (r *Response) doResponse(request *http.Request, w http.ResponseWriter, response string) {
-
-}
-
-type AuthResponseForm struct {
+type authResponseForm struct {
 	RelayState                  string
 	SAMLResponse                string
 	AssertionConsumerServiceURL string
@@ -73,7 +70,7 @@ func (r *Response) sendBackResponse(
 	case PostBinding:
 		respData := base64.StdEncoding.EncodeToString(respData)
 
-		data := AuthResponseForm{
+		data := authResponseForm{
 			r.RelayState,
 			respData,
 			r.AcsUrl,
@@ -90,76 +87,42 @@ func (r *Response) sendBackResponse(
 			return
 		}
 
-		http.Redirect(w, req, fmt.Sprintf("%s?%s", r.AcsUrl, buildRedirectQuery(string(respData), r.RelayState, r.SigAlg, r.Signature)), http.StatusFound)
+		http.Redirect(w, req, fmt.Sprintf("%s?%s", r.AcsUrl, BuildRedirectQuery(string(respData), r.RelayState, r.SigAlg, r.Signature)), http.StatusFound)
 		return
 	default:
 		//TODO: no binding
 	}
 }
 
-func (r *Response) makeUnsupportedBindingResponse(
-	message string,
-	timeFormat string,
-) *samlp.ResponseType {
-	now := time.Now().UTC()
-	nowStr := now.Format(timeFormat)
-	return makeResponse(
-		NewID(),
-		r.RequestID,
-		r.AcsUrl,
-		nowStr,
-		StatusCodeUnsupportedBinding,
-		message,
-		r.Issuer,
-	)
-}
-
-func (r *Response) makeResponderFailResponse(
-	message string,
-	timeFormat string,
-) *samlp.ResponseType {
-	now := time.Now().UTC()
-	nowStr := now.Format(timeFormat)
-	return makeResponse(
-		NewID(),
-		r.RequestID,
-		r.AcsUrl,
-		nowStr,
-		StatusCodeResponder,
-		message,
-		r.Issuer,
-	)
-}
-
-func (r *Response) makeDeniedResponse(
-	message string,
-	timeFormat string,
-) *samlp.ResponseType {
-	now := time.Now().UTC()
-	nowStr := now.Format(timeFormat)
-	return makeResponse(
-		NewID(),
-		r.RequestID,
-		r.AcsUrl,
-		nowStr,
-		StatusCodeRequestDenied,
-		message,
-		r.Issuer,
-	)
+func createSignature(response *Response, samlResponse *samlp.ResponseType, key *rsa.PrivateKey, cert []byte, signatureAlgorithm string) error {
+	switch response.ProtocolBinding {
+	case PostBinding:
+		if err := createPostSignature(samlResponse, key, cert, signatureAlgorithm); err != nil {
+			return fmt.Errorf("failed to sign response: %w", err)
+		}
+	case RedirectBinding:
+		sig, sigAlg, err := createRedirectSignature(samlResponse, key, cert, signatureAlgorithm, response.RelayState)
+		if err != nil {
+			return fmt.Errorf("failed to sign response: %w", err)
+		}
+		response.Signature = sig
+		response.SigAlg = sigAlg
+	}
+	return nil
 }
 
 func (r *Response) makeFailedResponse(
+	reason string,
 	message string,
 	timeFormat string,
 ) *samlp.ResponseType {
 	now := time.Now().UTC()
-	nowStr := now.Format(timeFormat)
 	return makeResponse(
 		NewID(),
 		r.RequestID,
 		r.AcsUrl,
-		nowStr,
-		StatusCodeAuthNFailed,
+		now.Format(timeFormat),
+		reason,
 		message,
 		r.Issuer,
 	)
@@ -168,14 +131,12 @@ func (r *Response) makeFailedResponse(
 func (r *Response) makeSuccessfulResponse(
 	attributes *Attributes,
 	timeFormat string,
+	expiration time.Duration,
 ) *samlp.ResponseType {
 	now := time.Now().UTC()
-	nowStr := now.Format(timeFormat)
-	fiveFromNowStr := now.Add(5 * time.Minute).Format(timeFormat)
-
 	return r.makeAssertionResponse(
-		nowStr,
-		fiveFromNowStr,
+		now.Format(timeFormat),
+		now.Add(expiration).Format(timeFormat),
 		attributes,
 	)
 }
@@ -206,13 +167,9 @@ func makeAttributeQueryResponse(
 	attributes *Attributes,
 	queriedAttrs []saml.AttributeType,
 	timeFormat string,
+	expiration time.Duration,
 ) *samlp.ResponseType {
 	now := time.Now().UTC()
-	nowStr := now.Format(timeFormat)
-	fiveMinutes, _ := time.ParseDuration("5m")
-	fiveFromNow := now.Add(fiveMinutes)
-	fiveFromNowStr := fiveFromNow.Format(timeFormat)
-
 	providedAttrs := []*saml.AttributeType{}
 	attrsSaml := attributes.GetSAML()
 	if queriedAttrs == nil || len(queriedAttrs) == 0 {
@@ -229,8 +186,8 @@ func makeAttributeQueryResponse(
 		}
 	}
 
-	response := makeResponse(NewID(), requestID, "", nowStr, StatusCodeSuccess, "", issuer)
-	assertion := makeAssertion(requestID, "", "", nowStr, fiveFromNowStr, issuer, attributes.GetNameID(), providedAttrs, entityID, false)
+	response := makeResponse(NewID(), requestID, "", now.Format(timeFormat), StatusCodeSuccess, "", issuer)
+	assertion := makeAssertion(requestID, "", "", now.Format(timeFormat), now.Add(expiration).Format(timeFormat), issuer, attributes.GetNameID(), providedAttrs, entityID, false)
 	response.Assertion = *assertion
 	return response
 }
