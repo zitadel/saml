@@ -1,7 +1,7 @@
 package provider
 
 import (
-	"context"
+	"crypto/rsa"
 	"encoding/base64"
 	"reflect"
 
@@ -63,16 +63,12 @@ func verifyPostSignature(
 }
 
 func createPostSignature(
-	ctx context.Context,
 	samlResponse *samlp.ResponseType,
-	idp *IdentityProvider,
+	key *rsa.PrivateKey,
+	cert []byte,
+	signatureAlgorithm string,
 ) error {
-	cert, key, err := getResponseCert(ctx, idp.storage)
-	if err != nil {
-		return err
-	}
-
-	signer, err := signature.GetSigner(cert, key, idp.conf.SignatureAlgorithm)
+	signer, err := signature.GetSigner(cert, key, signatureAlgorithm)
 	if err != nil {
 		return err
 	}

@@ -14,22 +14,29 @@ import (
 	dsig "github.com/russellhaering/goxmldsig"
 )
 
-func ParseCertificates(certStrs []string) ([]*x509.Certificate, error) {
-	var certs []*x509.Certificate
+var (
+	spaceRegex = regexp.MustCompile(`\s+`)
+)
 
-	regex := regexp.MustCompile(`\s+`)
-	for _, certStr := range certStrs {
-		certStr = regex.ReplaceAllString(certStr, "")
+func ParseCertificates(certStrs []string) ([]*x509.Certificate, error) {
+	certs := make([]*x509.Certificate, len(certStrs))
+
+	for i, certStr := range certStrs {
+		certStr = spaceRegex.ReplaceAllString(certStr, "")
 		certStr = strings.TrimPrefix(strings.TrimSuffix(certStr, "-----ENDCERTIFICATE-----"), "-----BEGINCERTIFICATE-----")
 		certBytes, err := base64.StdEncoding.DecodeString(certStr)
 		if err != nil {
-			return nil, fmt.Errorf("failed to parse PEM block containing the public key")
+			return nil, fmt.Errorf("failed to decode certificate:" + err.Error())
+		}
+		block, _ := pem.Decode(certBytes)
+		if block != nil {
+			certBytes = block.Bytes
 		}
 		parsedCert, err := x509.ParseCertificate(certBytes)
 		if err != nil {
 			return nil, fmt.Errorf("failed to parse certificate: " + err.Error())
 		}
-		certs = append(certs, parsedCert)
+		certs[i] = parsedCert
 	}
 
 	return certs, nil

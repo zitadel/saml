@@ -1,7 +1,7 @@
 package provider
 
 import (
-	"context"
+	"crypto/rsa"
 	"encoding/base64"
 	"fmt"
 	"net/url"
@@ -66,47 +66,41 @@ func verifyRedirectSignature(
 }
 
 func createRedirectSignature(
-	ctx context.Context,
 	samlResponse *samlp.ResponseType,
-	idp *IdentityProvider,
-	response *Response,
-) error {
+	key *rsa.PrivateKey,
+	cert []byte,
+	signatureAlgorithm string,
+	relayState string,
+) (string, string, error) {
 	resp, err := xml.Marshal(samlResponse)
 	if err != nil {
-		return err
+		return "", "", err
 	}
 
 	respData, err := xml.DeflateAndBase64(resp)
 	if err != nil {
-		return err
-	}
-
-	cert, key, err := getResponseCert(ctx, idp.storage)
-	if err != nil {
-		return err
+		return "", "", err
 	}
 
 	tlsCert, err := signature.ParseTlsKeyPair(cert, key)
 	if err != nil {
-		return err
+		return "", "", err
 	}
 
-	signingContext, err := signature.GetSigningContext(tlsCert, idp.conf.SignatureAlgorithm)
+	signingContext, err := signature.GetSigningContext(tlsCert, signatureAlgorithm)
 	if err != nil {
-		return err
+		return "", "", err
 	}
 
-	sig, err := signature.CreateRedirect(signingContext, buildRedirectQuery(string(respData), response.RelayState, idp.conf.SignatureAlgorithm, ""))
+	sig, err := signature.CreateRedirect(signingContext, BuildRedirectQuery(string(respData), relayState, signatureAlgorithm, ""))
 	if err != nil {
-		return err
+		return "", "", err
 	}
 
-	response.Signature = url.QueryEscape(base64.StdEncoding.EncodeToString(sig))
-	response.SigAlg = url.QueryEscape(base64.StdEncoding.EncodeToString([]byte(idp.conf.SignatureAlgorithm)))
-	return nil
+	return url.QueryEscape(base64.StdEncoding.EncodeToString(sig)), url.QueryEscape(base64.StdEncoding.EncodeToString([]byte(signatureAlgorithm))), nil
 }
 
-func buildRedirectQuery(
+func BuildRedirectQuery(
 	response string,
 	relayState string,
 	sigAlg string,
