@@ -628,7 +628,7 @@ func TestSSO_ssoHandleFunc(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			endpoint := NewEndpoint(tt.args.metadataEndpoint)
-			spInst, err := serviceprovider.NewServiceProvider(tt.args.sp.entityID, &serviceprovider.Config{Metadata: []byte(tt.args.sp.metadata)}, "")
+			spInst, err := serviceprovider.NewServiceProvider(tt.args.sp.entityID, &serviceprovider.Config{Metadata: []byte(tt.args.sp.metadata)}, func(s string) string { return "" })
 			if err != nil {
 				t.Errorf("error while creating service provider")
 				return
