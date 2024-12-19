@@ -283,7 +283,7 @@ func TestRedirect_verifyRedirectSignature(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			spConfig := &serviceprovider.Config{Metadata: []byte(tt.args.spMetadata)}
 
-			sp, err := serviceprovider.NewServiceProvider("test", spConfig, "")
+			sp, err := serviceprovider.NewServiceProvider("test", spConfig, func(s string) string { return "" })
 			if err != nil {
 				t.Errorf("verifyRedirectSignature() got = %v, wanted to create service provider instance", err)
 				return
