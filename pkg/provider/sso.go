@@ -38,10 +38,10 @@ func (p *IdentityProvider) ssoHandleFunc(w http.ResponseWriter, r *http.Request)
 		ErrorFunc: func(err error) {
 			http.Error(w, fmt.Errorf("failed to send response: %w", err).Error(), http.StatusInternalServerError)
 		},
-		Issuer: p.GetEntityID(r.Context()),
+		Issuer: p.GetEntityID(r),
 	}
 
-	metadata, _, err := p.GetMetadata(r.Context())
+	metadata, _, err := p.GetMetadata(r)
 	if err != nil {
 		err := fmt.Errorf("failed to read idp metadata: %w", err)
 		logging.Error(err)

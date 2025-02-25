@@ -281,7 +281,7 @@ func TestSSO_loginHandleFunc(t *testing.T) {
 				return
 			}
 
-			idp, err := NewIdentityProvider(endpoint, tt.args.config, mockStorage)
+			idp, err := newTestIdentityProvider(endpoint, tt.args.config, mockStorage, tt.args.issuer)
 			if (err != nil) != tt.res.err {
 				t.Errorf("NewIdentityProvider() error = %v", err.Error())
 				return
@@ -295,7 +295,7 @@ func TestSSO_loginHandleFunc(t *testing.T) {
 			w := httptest.NewRecorder()
 
 			req := httptest.NewRequest(http.MethodGet, callURL, nil)
-			callHandlerFuncWithIssuerInterceptor(tt.args.issuer, w, req, idp.callbackHandleFunc)
+			callHandlerFuncWithIssuerInterceptor(idp.issuerFromRequest, w, req, idp.callbackHandleFunc)
 
 			res := w.Result()
 			defer func() {

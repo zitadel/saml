@@ -3,9 +3,12 @@ package provider
 import (
 	"context"
 	"errors"
+	"log"
 	"net/http"
 	"net/url"
 	"strings"
+
+	"github.com/muhlemmer/httpforwarded"
 )
 
 type valueKey int
@@ -66,6 +69,45 @@ var (
 type IssuerFromRequest func(r *http.Request) string
 
 func IssuerFromHost(path string) func(bool) (IssuerFromRequest, error) {
+	return issuerFromForwardedOrHost(path, new(issuerConfig))
+}
+
+type IssuerFromOption func(c *issuerConfig)
+
+// WithIssuerFromCustomHeaders can be used to customize the header names used.
+// The same rules apply where the first successful host is returned.
+func WithIssuerFromCustomHeaders(headers ...string) IssuerFromOption {
+	return func(c *issuerConfig) {
+		for i, h := range headers {
+			headers[i] = http.CanonicalHeaderKey(h)
+		}
+		c.headers = headers
+	}
+}
+
+type issuerConfig struct {
+	headers []string
+}
+
+// IssuerFromForwardedOrHost tries to establish the Issuer based
+// on the Forwarded header host field.
+// If multiple Forwarded headers are present, the first mention
+// of the host field will be used.
+// If the Forwarded header is not present, no host field is found,
+// or there is a parser error the Request Host will be used as a fallback.
+// https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Forwarded
+func IssuerFromForwardedOrHost(path string, opts ...IssuerFromOption) func(bool) (IssuerFromRequest, error) {
+	c := &issuerConfig{
+		headers: []string{http.CanonicalHeaderKey("forwarded")},
+	}
+	for _, opt := range opts {
+		opt(c)
+	}
+
+	return issuerFromForwardedOrHost(path, c)
+}
+
+func issuerFromForwardedOrHost(path string, c *issuerConfig) func(bool) (IssuerFromRequest, error) {
 	return func(allowInsecure bool) (IssuerFromRequest, error) {
 		issuerPath, err := url.Parse(path)
 		if err != nil {
@@ -75,9 +117,26 @@ func IssuerFromHost(path string) func(bool) (IssuerFromRequest, error) {
 			return nil, err
 		}
 		return func(r *http.Request) string {
+			if host, ok := hostFromForwarded(r, c.headers); ok {
+				return dynamicIssuer(host, path, allowInsecure)
+			}
 			return dynamicIssuer(r.Host, path, allowInsecure)
 		}, nil
 	}
+}
+
+func hostFromForwarded(r *http.Request, headers []string) (host string, ok bool) {
+	for _, header := range headers {
+		hosts, err := httpforwarded.ParseParameter("host", r.Header[header])
+		if err != nil {
+			log.Printf("Err: issuer from forwarded header: %v", err) // TODO change to slog on next branch
+			continue
+		}
+		if len(hosts) > 0 {
+			return hosts[0], true
+		}
+	}
+	return "", false
 }
 
 func StaticIssuer(issuer string) func(bool) (IssuerFromRequest, error) {
