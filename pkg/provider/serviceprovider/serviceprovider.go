@@ -21,7 +21,7 @@ type ServiceProvider struct {
 	ID              string
 	Metadata        *md.EntityDescriptorType
 	signerPublicKey interface{}
-	defaultLoginURL string
+	loginURL        func(string) string
 }
 
 func (sp *ServiceProvider) GetEntityID() string {
@@ -29,10 +29,10 @@ func (sp *ServiceProvider) GetEntityID() string {
 }
 
 func (sp *ServiceProvider) LoginURL(id string) string {
-	return sp.defaultLoginURL + id
+	return sp.loginURL(id)
 }
 
-func NewServiceProvider(id string, config *Config, defaultLoginURL string) (*ServiceProvider, error) {
+func NewServiceProvider(id string, config *Config, loginURL func(string) string) (*ServiceProvider, error) {
 	metadata, err := xml.ParseMetadataXmlIntoStruct(config.Metadata)
 	if err != nil {
 		return nil, err
@@ -54,7 +54,7 @@ func NewServiceProvider(id string, config *Config, defaultLoginURL string) (*Ser
 		ID:              id,
 		Metadata:        metadata,
 		signerPublicKey: signerPublicKey,
-		defaultLoginURL: defaultLoginURL,
+		loginURL:        loginURL,
 	}, nil
 }
 
