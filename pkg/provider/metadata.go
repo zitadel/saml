@@ -1,7 +1,6 @@
 package provider
 
 import (
-	"context"
 	"encoding/base64"
 	"encoding/xml"
 	"fmt"
@@ -21,7 +20,7 @@ const (
 )
 
 func (p *Provider) metadataHandle(w http.ResponseWriter, r *http.Request) {
-	metadata, err := p.GetMetadata(r.Context())
+	metadata, err := p.GetMetadata(r)
 	if err != nil {
 		err := fmt.Errorf("error while getting metadata: %w", err)
 		logging.Error(err)
@@ -36,8 +35,8 @@ func (p *Provider) metadataHandle(w http.ResponseWriter, r *http.Request) {
 }
 
 func (p *IdentityProviderConfig) getMetadata(
-	ctx context.Context,
 	entityID string,
+	issuer string,
 	idpCertData []byte,
 	timeFormat string,
 ) (*md.IDPSSODescriptorType, *md.AttributeAuthorityDescriptorType) {
@@ -99,10 +98,10 @@ func (p *IdentityProviderConfig) getMetadata(
 			SingleSignOnService: []md.EndpointType{
 				{
 					Binding:  RedirectBinding,
-					Location: endpoints.singleSignOnEndpoint.Absolute(IssuerFromContext(ctx)),
+					Location: endpoints.singleSignOnEndpoint.Absolute(issuer),
 				}, {
 					Binding:  PostBinding,
-					Location: endpoints.singleSignOnEndpoint.Absolute(IssuerFromContext(ctx)),
+					Location: endpoints.singleSignOnEndpoint.Absolute(issuer),
 				},
 			},
 			//TODO definition for more profiles
@@ -113,11 +112,11 @@ func (p *IdentityProviderConfig) getMetadata(
 			SingleLogoutService: []md.EndpointType{
 				{
 					Binding:  RedirectBinding,
-					Location: endpoints.singleLogoutEndpoint.Absolute(IssuerFromContext(ctx)),
+					Location: endpoints.singleLogoutEndpoint.Absolute(issuer),
 				},
 				{
 					Binding:  PostBinding,
-					Location: endpoints.singleLogoutEndpoint.Absolute(IssuerFromContext(ctx)),
+					Location: endpoints.singleLogoutEndpoint.Absolute(issuer),
 				},
 			},
 			NameIDFormat:  []string{"urn:oasis:names:tc:SAML:2.0:nameid-format:persistent"},
@@ -136,7 +135,7 @@ func (p *IdentityProviderConfig) getMetadata(
 			ErrorURL:                   p.MetadataIDPConfig.ErrorURL,
 			AttributeService: []md.EndpointType{{
 				Binding:  "urn:oasis:names:tc:SAML:2.0:bindings:SOAP",
-				Location: endpoints.attributeEndpoint.Absolute(IssuerFromContext(ctx)),
+				Location: endpoints.attributeEndpoint.Absolute(issuer),
 			}},
 			NameIDFormat: []string{"urn:oasis:names:tc:SAML:2.0:nameid-format:persistent"},
 			//TODO definition for more profiles
@@ -153,13 +152,13 @@ func (p *IdentityProviderConfig) getMetadata(
 }
 
 func (c *Config) getMetadata(
-	ctx context.Context,
+	req *http.Request,
 	idp *IdentityProvider,
 ) (*md.EntityDescriptorType, error) {
 
 	entity := &md.EntityDescriptorType{
 		XMLName:       xml.Name{Local: "md"},
-		EntityID:      md.EntityIDType(idp.GetEntityID(ctx)),
+		EntityID:      md.EntityIDType(idp.GetEntityID(req)),
 		Id:            NewID(),
 		Signature:     nil,
 		Organization:  nil,
@@ -167,7 +166,7 @@ func (c *Config) getMetadata(
 	}
 
 	if c.IDPConfig != nil {
-		idpMetadata, idpAAMetadata, err := idp.GetMetadata(ctx)
+		idpMetadata, idpAAMetadata, err := idp.GetMetadata(req)
 		if err != nil {
 			return nil, err
 		}

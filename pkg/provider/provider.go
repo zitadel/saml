@@ -74,23 +74,23 @@ const (
 )
 
 type Provider struct {
-	storage      Storage
-	httpHandler  http.Handler
-	interceptors []HttpInterceptor
-	insecure     bool
-
-	metadataEndpoint  *Endpoint
-	conf              *Config
+	storage           Storage
+	httpHandler       http.Handler
+	interceptors      []HttpInterceptor
+	insecure          bool
 	issuerFromRequest IssuerFromRequest
-	identityProvider  *IdentityProvider
+
+	metadataEndpoint *Endpoint
+	conf             *Config
+	identityProvider *IdentityProvider
 }
 
 func NewProvider(
 	storage Storage,
-	path string,
+	issuer func(insecure bool) (IssuerFromRequest, error),
 	conf *Config,
 	providerOpts ...Option,
-) (*Provider, error) {
+) (_ *Provider, err error) {
 	metadataEndpoint := NewEndpoint(DefaultMetadataEndpoint)
 	if conf.Metadata != nil {
 		metadataEndpoint = *conf.Metadata
@@ -118,23 +118,26 @@ func NewProvider(
 		}
 	}
 
-	issuerFromRequest, err := IssuerFromHost(path)(prov.insecure)
+	idp.issuerFromRequest, err = issuer(prov.insecure)
 	if err != nil {
 		return nil, err
 	}
-	prov.issuerFromRequest = issuerFromRequest
 
 	prov.httpHandler = CreateRouter(prov, prov.interceptors...)
 
 	return prov, nil
 }
 
-func NewID() string {
-	return fmt.Sprintf("_%s", uuid.New())
+func (p *Provider) GetEntityID(r *http.Request) string {
+	return p.identityProvider.GetEntityID(r)
 }
 
 func (p *Provider) IssuerFromRequest(r *http.Request) string {
-	return p.issuerFromRequest(r)
+	return p.identityProvider.issuerFromRequest(r)
+}
+
+func NewID() string {
+	return fmt.Sprintf("_%s", uuid.New())
 }
 
 type Option func(o *Provider) error
@@ -160,13 +163,13 @@ func (p *Provider) Probes() []ProbesFn {
 	}
 }
 
-func (p *Provider) GetMetadata(ctx context.Context) (*md.EntityDescriptorType, error) {
-	metadata, err := p.conf.getMetadata(ctx, p.identityProvider)
+func (p *Provider) GetMetadata(req *http.Request) (*md.EntityDescriptorType, error) {
+	metadata, err := p.conf.getMetadata(req, p.identityProvider)
 	if err != nil {
 		return nil, err
 	}
 
-	cert, key, err := getMetadataCert(ctx, p.storage)
+	cert, key, err := getMetadataCert(req.Context(), p.storage)
 	if p.conf.MetadataConfig != nil && p.conf.MetadataConfig.SignatureAlgorithm != "" {
 		signer, err := signature.GetSigner(cert, key, p.conf.MetadataConfig.SignatureAlgorithm)
 		if err != nil {
@@ -201,7 +204,7 @@ type HttpInterceptor func(http.Handler) http.Handler
 func CreateRouter(p *Provider, interceptors ...HttpInterceptor) *mux.Router {
 	router := mux.NewRouter()
 
-	router.Use(intercept(p.issuerFromRequest, interceptors...))
+	router.Use(intercept(p.IssuerFromRequest, interceptors...))
 	router.HandleFunc(healthEndpoint, healthHandler)
 	router.HandleFunc(readinessEndpoint, readyHandler(p.Probes()))
 	router.HandleFunc(p.metadataEndpoint.Relative(), p.metadataHandle)

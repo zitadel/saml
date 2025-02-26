@@ -30,7 +30,7 @@ func (p *IdentityProvider) logoutHandleFunc(w http.ResponseWriter, r *http.Reque
 		ErrorFunc: func(err error) {
 			http.Error(w, fmt.Errorf("failed to send response: %w", err).Error(), http.StatusInternalServerError)
 		},
-		Issuer: p.GetEntityID(r.Context()),
+		Issuer: p.GetEntityID(r),
 	}
 
 	// parse from to get logout request
