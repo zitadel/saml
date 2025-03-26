@@ -25,7 +25,7 @@ func (p *IdentityProvider) attributeQueryHandleFunc(w http.ResponseWriter, r *ht
 	var attrQuery *samlp.AttributeQueryType
 	var response *samlp.ResponseType
 
-	metadata, _, err := p.GetMetadata(r)
+	metadata, _, err := p.GetMetadata(r.Context())
 	if err != nil {
 		err := fmt.Errorf("failed to read idp metadata: %w", err)
 		logging.Error(err)
@@ -128,7 +128,7 @@ func (p *IdentityProvider) attributeQueryHandleFunc(w http.ResponseWriter, r *ht
 					queriedAttrs = append(queriedAttrs, queriedAttr)
 				}
 			}
-			response = makeAttributeQueryResponse(attrQuery.Id, p.GetEntityID(r), sp.GetEntityID(), attrs, queriedAttrs, p.TimeFormat, p.Expiration)
+			response = makeAttributeQueryResponse(attrQuery.Id, p.GetEntityID(r.Context()), sp.GetEntityID(), attrs, queriedAttrs, p.TimeFormat, p.Expiration)
 			return nil
 		},
 		func() {

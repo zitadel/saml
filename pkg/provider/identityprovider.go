@@ -68,9 +68,8 @@ type IdentityProvider struct {
 	postTemplate   *template.Template
 	logoutTemplate *template.Template
 
-	issuerFromRequest IssuerFromRequest
-	metadataEndpoint  *Endpoint
-	endpoints         *Endpoints
+	metadataEndpoint *Endpoint
+	endpoints        *Endpoints
 
 	TimeFormat string
 	Expiration time.Duration
@@ -120,12 +119,8 @@ func NewIdentityProvider(metadata Endpoint, conf *IdentityProviderConfig, storag
 	return idp, nil
 }
 
-func (p *IdentityProvider) IssuerFromRequest(r *http.Request) string {
-	return p.issuerFromRequest(r)
-}
-
-func (p *IdentityProvider) GetEntityID(req *http.Request) string {
-	return p.metadataEndpoint.Absolute(p.IssuerFromRequest(req))
+func (p *IdentityProvider) GetEntityID(ctx context.Context) string {
+	return p.metadataEndpoint.Absolute(IssuerFromContext(ctx))
 }
 
 func endpointConfigToEndpoints(conf *EndpointConfig) *Endpoints {
@@ -161,13 +156,13 @@ func endpointConfigToEndpoints(conf *EndpointConfig) *Endpoints {
 	return endpoints
 }
 
-func (p *IdentityProvider) GetMetadata(req *http.Request) (*md.IDPSSODescriptorType, *md.AttributeAuthorityDescriptorType, error) {
-	cert, _, err := getResponseCert(req.Context(), p.storage)
+func (p *IdentityProvider) GetMetadata(ctx context.Context) (*md.IDPSSODescriptorType, *md.AttributeAuthorityDescriptorType, error) {
+	cert, _, err := getResponseCert(ctx, p.storage)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	metadata, aaMetadata := p.conf.getMetadata(p.GetEntityID(req), p.IssuerFromRequest(req), cert, p.TimeFormat)
+	metadata, aaMetadata := p.conf.getMetadata(p.GetEntityID(ctx), IssuerFromContext(ctx), cert, p.TimeFormat)
 	return metadata, aaMetadata, nil
 }
 

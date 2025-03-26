@@ -118,7 +118,7 @@ func NewProvider(
 		}
 	}
 
-	idp.issuerFromRequest, err = issuer(prov.insecure)
+	prov.issuerFromRequest, err = issuer(prov.insecure)
 	if err != nil {
 		return nil, err
 	}
@@ -128,12 +128,12 @@ func NewProvider(
 	return prov, nil
 }
 
-func (p *Provider) GetEntityID(r *http.Request) string {
-	return p.identityProvider.GetEntityID(r)
+func (p *Provider) GetEntityID(ctx context.Context) string {
+	return p.identityProvider.GetEntityID(ctx)
 }
 
 func (p *Provider) IssuerFromRequest(r *http.Request) string {
-	return p.identityProvider.issuerFromRequest(r)
+	return p.issuerFromRequest(r)
 }
 
 func NewID() string {
@@ -163,13 +163,13 @@ func (p *Provider) Probes() []ProbesFn {
 	}
 }
 
-func (p *Provider) GetMetadata(req *http.Request) (*md.EntityDescriptorType, error) {
-	metadata, err := p.conf.getMetadata(req, p.identityProvider)
+func (p *Provider) GetMetadata(ctx context.Context) (*md.EntityDescriptorType, error) {
+	metadata, err := p.conf.getMetadata(ctx, p.identityProvider)
 	if err != nil {
 		return nil, err
 	}
 
-	cert, key, err := getMetadataCert(req.Context(), p.storage)
+	cert, key, err := getMetadataCert(ctx, p.storage)
 	if p.conf.MetadataConfig != nil && p.conf.MetadataConfig.SignatureAlgorithm != "" {
 		signer, err := signature.GetSigner(cert, key, p.conf.MetadataConfig.SignatureAlgorithm)
 		if err != nil {
@@ -204,7 +204,7 @@ type HttpInterceptor func(http.Handler) http.Handler
 func CreateRouter(p *Provider, interceptors ...HttpInterceptor) *mux.Router {
 	router := mux.NewRouter()
 
-	router.Use(intercept(p.IssuerFromRequest, interceptors...))
+	router.Use(intercept(p.issuerFromRequest, interceptors...))
 	router.HandleFunc(healthEndpoint, healthHandler)
 	router.HandleFunc(readinessEndpoint, readyHandler(p.Probes()))
 	router.HandleFunc(p.metadataEndpoint.Relative(), p.metadataHandle)
