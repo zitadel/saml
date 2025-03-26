@@ -1,6 +1,7 @@
 package provider
 
 import (
+	"context"
 	"encoding/base64"
 	"encoding/xml"
 	"fmt"
@@ -20,7 +21,7 @@ const (
 )
 
 func (p *Provider) metadataHandle(w http.ResponseWriter, r *http.Request) {
-	metadata, err := p.GetMetadata(r)
+	metadata, err := p.GetMetadata(r.Context())
 	if err != nil {
 		err := fmt.Errorf("error while getting metadata: %w", err)
 		logging.Error(err)
@@ -152,13 +153,13 @@ func (p *IdentityProviderConfig) getMetadata(
 }
 
 func (c *Config) getMetadata(
-	req *http.Request,
+	ctx context.Context,
 	idp *IdentityProvider,
 ) (*md.EntityDescriptorType, error) {
 
 	entity := &md.EntityDescriptorType{
 		XMLName:       xml.Name{Local: "md"},
-		EntityID:      md.EntityIDType(idp.GetEntityID(req)),
+		EntityID:      md.EntityIDType(idp.GetEntityID(ctx)),
 		Id:            NewID(),
 		Signature:     nil,
 		Organization:  nil,
@@ -166,7 +167,7 @@ func (c *Config) getMetadata(
 	}
 
 	if c.IDPConfig != nil {
-		idpMetadata, idpAAMetadata, err := idp.GetMetadata(req)
+		idpMetadata, idpAAMetadata, err := idp.GetMetadata(ctx)
 		if err != nil {
 			return nil, err
 		}

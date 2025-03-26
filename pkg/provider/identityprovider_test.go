@@ -170,7 +170,7 @@ func TestIDP_certificateHandleFunc(t *testing.T) {
 				return
 			}
 
-			idp, err := newTestIdentityProvider(endpoint, tt.args.config, mockStorage, tt.args.issuer)
+			idp, err := newTestIdentityProvider(endpoint, tt.args.config, mockStorage)
 			if (err != nil) != tt.res.err {
 				t.Errorf("NewIdentityProvider() error = %v", err.Error())
 				return
@@ -182,7 +182,7 @@ func TestIDP_certificateHandleFunc(t *testing.T) {
 			req := httptest.NewRequest(http.MethodGet, idp.endpoints.certificateEndpoint.Relative(), nil)
 			w := httptest.NewRecorder()
 
-			callHandlerFuncWithIssuerInterceptor(idp.issuerFromRequest, w, req, idp.certificateHandleFunc)
+			callHandlerFuncWithIssuerInterceptor(tt.args.issuer, w, req, idp.certificateHandleFunc)
 
 			res := w.Result()
 			defer func() {
@@ -199,12 +199,8 @@ func TestIDP_certificateHandleFunc(t *testing.T) {
 	}
 }
 
-func newTestIdentityProvider(metadata Endpoint, conf *IdentityProviderConfig, storage IDPStorage, issuer string) (_ *IdentityProvider, err error) {
+func newTestIdentityProvider(metadata Endpoint, conf *IdentityProviderConfig, storage IDPStorage) (_ *IdentityProvider, err error) {
 	idp, err := NewIdentityProvider(metadata, conf, storage)
-	if err != nil {
-		return nil, err
-	}
-	idp.issuerFromRequest, err = StaticIssuer(issuer)(true)
 	if err != nil {
 		return nil, err
 	}
@@ -249,8 +245,9 @@ func idpStorageWithResponseCert(t *testing.T, cert []byte, pKey []byte) *mock.Mo
 	return mockStorage
 }
 
-func callHandlerFuncWithIssuerInterceptor(issuer IssuerFromRequest, w http.ResponseWriter, r *http.Request, handlerFunc func(w http.ResponseWriter, r *http.Request)) {
-	interceptor := NewIssuerInterceptor(issuer)
+func callHandlerFuncWithIssuerInterceptor(issuer string, w http.ResponseWriter, r *http.Request, handlerFunc func(w http.ResponseWriter, r *http.Request)) {
+	issuerFromRequest, _ := StaticIssuer(issuer)(true)
+	interceptor := NewIssuerInterceptor(issuerFromRequest)
 
 	intercepted := interceptor.HandlerFunc(handlerFunc)
 	intercepted(w, r)

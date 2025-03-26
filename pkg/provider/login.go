@@ -17,7 +17,7 @@ func (p *IdentityProvider) callbackHandleFunc(w http.ResponseWriter, r *http.Req
 		ErrorFunc: func(err error) {
 			http.Error(w, fmt.Errorf("failed to send response: %w", err).Error(), http.StatusInternalServerError)
 		},
-		Issuer: p.GetEntityID(r),
+		Issuer: p.GetEntityID(r.Context()),
 	}
 
 	if err := r.ParseForm(); err != nil {

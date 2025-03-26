@@ -14,7 +14,7 @@ import (
 type valueKey int
 
 var (
-	issuer valueKey = 1
+	issuerKey valueKey = 1
 )
 
 type IssuerInterceptor struct {
@@ -44,13 +44,13 @@ func (i *IssuerInterceptor) HandlerFunc(next http.HandlerFunc) http.HandlerFunc 
 // IssuerFromContext reads the issuer from the context (set by an IssuerInterceptor)
 // it will return an empty string if not found
 func IssuerFromContext(ctx context.Context) string {
-	ctxIssuer, _ := ctx.Value(issuer).(string)
+	ctxIssuer, _ := ctx.Value(issuerKey).(string)
 	return ctxIssuer
 }
 
 // ContextWithIssuer returns a new context with issuer set to it.
 func ContextWithIssuer(ctx context.Context, issuer string) context.Context {
-	return context.WithValue(ctx, issuer, issuer)
+	return context.WithValue(ctx, issuerKey, issuer)
 }
 
 func (i *IssuerInterceptor) setIssuerCtx(w http.ResponseWriter, r *http.Request, next http.Handler) {
