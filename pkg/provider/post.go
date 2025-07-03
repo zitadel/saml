@@ -73,11 +73,18 @@ func createPostSignature(
 		return err
 	}
 
-	sig, err := signature.Create(signer, samlResponse.Assertion)
+	asig, err := signature.Create(signer, samlResponse.Assertion)
 	if err != nil {
 		return err
 	}
 
-	samlResponse.Assertion.Signature = sig
+	samlResponse.Assertion.Signature = asig
+
+	rsig, err := signature.Create(signer, samlResponse)
+	if err != nil {
+		return err
+	}
+
+	samlResponse.Signature = rsig
 	return nil
 }
