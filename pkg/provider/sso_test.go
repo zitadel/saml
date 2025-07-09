@@ -1,6 +1,9 @@
 package provider
 
 import (
+	"bytes"
+	"compress/flate"
+	"encoding/base64"
 	"fmt"
 	"io/ioutil"
 	"net/http"
@@ -25,8 +28,10 @@ func TestSSO_getAcsUrlAndBindingForResponse(t *testing.T) {
 		binding string
 	}
 	type args struct {
-		acs            []md.IndexedEndpointType
-		requestBinding string
+		acs             []md.IndexedEndpointType
+		requestBinding  string
+		requestAcsUrl   string
+		requestAcsIndex *int
 	}
 	tests := []struct {
 		name string
@@ -40,6 +45,8 @@ func TestSSO_getAcsUrlAndBindingForResponse(t *testing.T) {
 				{Index: "2", Binding: PostBinding, Location: "post"},
 			},
 			RedirectBinding,
+			"",
+			nil,
 		},
 		res{
 			acs:     "redirect",
@@ -54,6 +61,8 @@ func TestSSO_getAcsUrlAndBindingForResponse(t *testing.T) {
 					{Index: "2", Binding: PostBinding, Location: "post"},
 				},
 				RedirectBinding,
+				"",
+				nil,
 			},
 			res{
 				acs:     "redirect",
@@ -68,6 +77,8 @@ func TestSSO_getAcsUrlAndBindingForResponse(t *testing.T) {
 					{Binding: PostBinding, Location: "post"},
 				},
 				RedirectBinding,
+				"",
+				nil,
 			},
 			res{
 				acs:     "redirect",
@@ -82,6 +93,8 @@ func TestSSO_getAcsUrlAndBindingForResponse(t *testing.T) {
 					{Binding: PostBinding, Location: "post"},
 				},
 				PostBinding,
+				"",
+				nil,
 			},
 			res{
 				acs:     "post",
@@ -94,6 +107,8 @@ func TestSSO_getAcsUrlAndBindingForResponse(t *testing.T) {
 				{Binding: RedirectBinding, Location: "redirect"},
 			},
 				PostBinding,
+				"",
+				nil,
 			},
 			res{
 				acs:     "redirect",
@@ -107,19 +122,57 @@ func TestSSO_getAcsUrlAndBindingForResponse(t *testing.T) {
 					{Binding: PostBinding, Location: "post"},
 				},
 				RedirectBinding,
+				"",
+				nil,
 			},
 			res{
 				acs:     "post",
 				binding: PostBinding,
 			},
 		},
+		{
+			"sp with duplicate bindings, acs url match used",
+			args{[]md.IndexedEndpointType{
+				{Index: "1", Binding: PostBinding, Location: "https://host1"},
+				{Index: "2", Binding: PostBinding, Location: "https://host2"},
+			},
+				PostBinding,
+				"https://host2",
+				nil,
+			},
+			res{
+				acs:     "https://host2",
+				binding: PostBinding,
+			},
+		},
+		{
+			"sp with index match",
+			args{
+				[]md.IndexedEndpointType{
+					{Index: "5", Binding: PostBinding, Location: "https://wrong"},
+					{Index: "1", Binding: PostBinding, Location: "https://right"},
+				},
+				PostBinding,
+				"",
+				func() *int { i := 1; return &i }(),
+			},
+			res{
+				acs:     "https://right",
+				binding: PostBinding,
+			},
+		},
 	}
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			acs, binding := GetAcsUrlAndBindingForResponse(tt.args.acs, tt.args.requestBinding)
-			if acs != tt.res.acs && binding != tt.res.binding {
+			acs, binding := GetAcsUrlAndBindingForResponse(
+				tt.args.acs,
+				tt.args.requestBinding,
+				tt.args.requestAcsUrl,
+				tt.args.requestAcsIndex,
+			)
+			if acs != tt.res.acs || binding != tt.res.binding {
 				t.Errorf("GetAcsUrlAndBindingForResponse() got = %v/%v, want %v/%v", acs, binding, tt.res.acs, tt.res.binding)
-				return
 			}
 		})
 	}
@@ -623,7 +676,123 @@ func TestSSO_ssoHandleFunc(t *testing.T) {
 			res{
 				code: 303,
 				err:  false,
-			}},
+			},
+		},
+		{
+			name: "redirect request with AssertionConsumerServiceURL match",
+			args: args{
+				issuer:           "http://localhost:50002",
+				metadataEndpoint: "/saml/metadata",
+				config: &IdentityProviderConfig{
+					SignatureAlgorithm: dsig.RSASHA256SignatureMethod,
+					MetadataIDPConfig:  &MetadataIDPConfig{},
+					Endpoints: &EndpointConfig{
+						SingleSignOn: getEndpointPointer("/saml/SSO", "http://localhost:50002/saml/SSO"),
+					},
+				},
+				certificate: "-----BEGIN CERTIFICATE-----\nMIICvDCCAaQCCQD6E8ZGsQ2usjANBgkqhkiG9w0BAQsFADAgMR4wHAYDVQQDDBVt\neXNlcnZpY2UuZXhhbXBsZS5jb20wHhcNMjIwMjE3MTQwNjM5WhcNMjMwMjE3MTQw\nNjM5WjAgMR4wHAYDVQQDDBVteXNlcnZpY2UuZXhhbXBsZS5jb20wggEiMA0GCSqG\nSIb3DQEBAQUAA4IBDwAwggEKAoIBAQC7XKdCRxUZXjdqVqwwwOJqc1Ch0nOSmk+U\nerkUqlviWHdeLR+FolHKjqLzCBloAz4xVc0DFfR76gWcWAHJloqZ7GBS7NpDhzV8\nG+cXQ+bTU0Lu2e73zCQb30XUdKhWiGfDKaU+1xg9CD/2gIfsYPs3TTq1sq7oCs5q\nLdUHaVL5kcRaHKdnTi7cs5i9xzs3TsUnXcrJPwydjp+aEkyRh07oMpXBEobGisfF\n2p1MA6pVW2gjmywf7D5iYEFELQhM7poqPN3/kfBvU1n7Lfgq7oxmv/8LFi4Zopr5\nnyqsz26XPtUy1WqTzgznAmP+nN0oBTERFVbXXdRa3k2v4cxTNPn/AgMBAAEwDQYJ\nKoZIhvcNAQELBQADggEBAJYxROWSOZbOzXzafdGjQKsMgN948G/hHwVuZneyAcVo\nLMFTs1Weya9Z+snMp1u0AdDGmQTS9zGnD7syDYGOmgigOLcMvLMoWf5tCQBbEukW\n8O7DPjRR0XypChGSsHsqLGO0B0HaTel0HdP9Si827OCkc9Q+WbsFG/8/4ToGWL+u\nla1WuLawozoj8umPi9D8iXCoW35y2STU+WFQG7W+Kfdu+2CYz/0tGdwVqNG4Wsfa\nwWchrS00vGFKjm/fJc876gAfxiMH1I9fZvYSAxAZ3sVI//Ml2sUdgf067ywQ75oa\nLSS2NImmz5aos3vuWmOXhILd7iTU+BD8Uv6vWbI7I1M=\n-----END CERTIFICATE-----\n",
+				key:         "-----BEGIN PRIVATE KEY-----\nMIIEvQIBADANBgkqhkiG9w0BAQEFAASCBKcwggSjAgEAAoIBAQC7XKdCRxUZXjdq\nVqwwwOJqc1Ch0nOSmk+UerkUqlviWHdeLR+FolHKjqLzCBloAz4xVc0DFfR76gWc\nWAHJloqZ7GBS7NpDhzV8G+cXQ+bTU0Lu2e73zCQb30XUdKhWiGfDKaU+1xg9CD/2\ngIfsYPs3TTq1sq7oCs5qLdUHaVL5kcRaHKdnTi7cs5i9xzs3TsUnXcrJPwydjp+a\nEkyRh07oMpXBEobGisfF2p1MA6pVW2gjmywf7D5iYEFELQhM7poqPN3/kfBvU1n7\nLfgq7oxmv/8LFi4Zopr5nyqsz26XPtUy1WqTzgznAmP+nN0oBTERFVbXXdRa3k2v\n4cxTNPn/AgMBAAECggEAF+rV9yH30Ysza8GwrXCR9qDN1Dp3QmmsavnXkonEvPoq\nEr2T3o0//6mBp6CLDboMQGQBjblJwl+3Y6PgZolvHAMOsMdHfYNPEo7FSzUBzEw+\nqRrs5HkMyvoPgfV6X8F97W3tiD4Q/AmHkMILl+MxbnfPXM54gWqPuwIqxY1uaCk5\nREwyb7WBon3rd58ceOI1SLRjod6SbqWBMMSN3cJ+5VEPObFjw/RlhNQ5rBI8G5Kt\nso2zBU5C4BB2CvqlWy98WDKJkTvWHbiTjZCy8BQ+gQ6UJM2vaNELFOVpuMGQnMIi\noWiX10Jg2e1gP9j3TdrohlGF8M3+TXjSFKNmeX0DUQKBgQDx7UazUWS5RtkgnjH9\nw2xH2xkstJVD7nAS8VTxNwcrgjVXPvTJha9El904obUjyRX7ppb02tuH5ML/bZh6\n9lL4bP5+SHcJ10e4q8CK/KAGHD6BYAbaGXRq0CoSk5a3vv5XPdob4T5qKCIHFpnu\nMfbvdbEoameLOyRYOGu/yVZIiwKBgQDGQs7FRTisHV0xooiRmlvYF0dcd19qpLed\nqhgJNqBPOTEvvGvJNRoi39haEY3cuTqsxZ5FAlFlVFMUUozz+d0xBLLInoVY/Y4h\nhSdGmdw/A6oHodLqyEp3N5RZNdLlh8/nDS3xXzMotAl75bW5kc2ttcRhRdtyNJ9Z\nup0PgppO3QKBgEC45upAQz8iCiKkz+EA8C4FGqYQJcLHvmoC8GOcAioMqrKNoDVt\ns2cZbdChynEpcd0iQ058YrDnbZeiPWHgFnBp0Gf+gQI7+u8X2+oTDci0s7Au/YZJ\nuxB8YlUX8QF1clvqqzg8OVNzKy9UR5gm+9YyWVPjq5HfH6kOZx0nAxNjAoGAERt8\nqgsCC9/wxbKnpCC0oh3IG5N1WUdjTKh7sHfVN2DQ/LR+fHsniTDVg1gWbKBTDsty\nj7PWgC7ZiFxjKz45NtyX7LW4/efLFttdezsVhR500nnFMFseCdFy7Iu3afThHKfH\nehdj27RFSTqWBrAtFjsj+dzERcOCqIRwvwDe/cUCgYEA5+1mzVXDVjKsWylKJPk+\nZZA4LUfvmTj3VLNDZrlSAI/xEikCFio0QWEA2TQYTAwbXTrKwQSeHQRhv7OTc1h+\nMhpAgvs189ze5J4jiNmULEkkrO+Cxxnw8tyV+UFRZtzW9gUoVBwXiZ/Wbl9sfnlO\nwLJHc0j6OltPcPJmxHP8gQI=\n-----END PRIVATE KEY-----\n",
+				request: request{
+					ID:          "expectedAcsUrl",
+					Binding:     RedirectBinding,
+					SAMLRequest: url.QueryEscape(generateSAMLRequestWithACSUrl("https://expected.acs.url")),
+					RelayState:  url.QueryEscape("K6LS7mdqUO4SGedbfa8nBIyX-7K8gGbrHMqIMwVn6zCKLLoADHjEHUAm"),
+					Signature:   url.QueryEscape("ubt5RiDqyGchm5JvEUugW1HKtyZL3mDuvwslmWIGsQoLP+tFFVTmvbrVOFhczJ3DERS5E/cOAflY1oId5lWfTWoJQleKbklSmFzDQXhQqBpudJidOn7WeaySHHyvRRutuDz6Xe5r0eHvK7Oxj3r5Ci1tn1uDFzBmYQy2uRS2/co3tg5QS7NB9g7nofmqh8AqHg+zD4TrvkDqD5fnHscqk/Ol/qJVgTyC979jD/c4tRqU83PBWrn2XHxufIN3T0TXh8zQ+o+VEj4B41AGsq6oUBnVfpuj/uyqF63yCBunjJcGZXY3RJvydRXFOXbC72UJ56d9gjda/ea2dygeoHzOhw=="),
+					SigAlg:      url.QueryEscape("http://www.w3.org/2000/09/xmldsig#rsa-sha1"),
+				},
+				sp: sp{
+					entityID: "http://localhost:8000/saml/metadata",
+					metadata: compactXML(`<EntityDescriptor xmlns="urn:oasis:names:tc:SAML:2.0:metadata" entityID="http://localhost:8000/saml/metadata">
+					  <SPSSODescriptor xmlns="urn:oasis:names:tc:SAML:2.0:metadata" protocolSupportEnumeration="urn:oasis:names:tc:SAML:2.0:protocol" AuthnRequestsSigned="true" WantAssertionsSigned="true">
+					    <KeyDescriptor use="encryption">
+							<KeyInfo xmlns="http://www.w3.org/2000/09/xmldsig#">
+								<X509Data xmlns="http://www.w3.org/2000/09/xmldsig#">
+									<X509Certificate xmlns="http://www.w3.org/2000/09/xmldsig#"> MIICvDCCAaQCCQD6E8ZGsQ2usjANBgkqhkiG9w0BAQsFADAgMR4wHAYDVQQDDBVteXNlcnZpY2UuZXhhbXBsZS5jb20wHhcNMjIwMjE3MTQwNjM5WhcNMjMwMjE3MTQwNjM5WjAgMR4wHAYDVQQDDBVteXNlcnZpY2UuZXhhbXBsZS5jb20wggEiMA0GCSqGSIb3DQEBAQUAA4IBDwAwggEKAoIBAQC7XKdCRxUZXjdqVqwwwOJqc1Ch0nOSmk+UerkUqlviWHdeLR+FolHKjqLzCBloAz4xVc0DFfR76gWcWAHJloqZ7GBS7NpDhzV8G+cXQ+bTU0Lu2e73zCQb30XUdKhWiGfDKaU+1xg9CD/2gIfsYPs3TTq1sq7oCs5qLdUHaVL5kcRaHKdnTi7cs5i9xzs3TsUnXcrJPwydjp+aEkyRh07oMpXBEobGisfF2p1MA6pVW2gjmywf7D5iYEFELQhM7poqPN3/kfBvU1n7Lfgq7oxmv/8LFi4Zopr5nyqsz26XPtUy1WqTzgznAmP+nN0oBTERFVbXXdRa3k2v4cxTNPn/AgMBAAEwDQYJKoZIhvcNAQELBQADggEBAJYxROWSOZbOzXzafdGjQKsMgN948G/hHwVuZneyAcVoLMFTs1Weya9Z+snMp1u0AdDGmQTS9zGnD7syDYGOmgigOLcMvLMoWf5tCQBbEukW8O7DPjRR0XypChGSsHsqLGO0B0HaTel0HdP9Si827OCkc9Q+WbsFG/8/4ToGWL+ula1WuLawozoj8umPi9D8iXCoW35y2STU+WFQG7W+Kfdu+2CYz/0tGdwVqNG4WsfawWchrS00vGFKjm/fJc876gAfxiMH1I9fZvYSAxAZ3sVI//Ml2sUdgf067ywQ75oaLSS2NImmz5aos3vuWmOXhILd7iTU+BD8Uv6vWbI7I1M=</X509Certificate>
+
+								</X509Data>
+							</KeyInfo>
+							<EncryptionMethod Algorithm="http://www.w3.org/2001/04/xmlenc#aes128-cbc"></EncryptionMethod>
+							<EncryptionMethod Algorithm="http://www.w3.org/2001/04/xmlenc#aes192-cbc"></EncryptionMethod>
+							<EncryptionMethod Algorithm="http://www.w3.org/2001/04/xmlenc#aes256-cbc"></EncryptionMethod>
+							<EncryptionMethod Algorithm="http://www.w3.org/2001/04/xmlenc#rsa-oaep-mgf1p"></EncryptionMethod>
+						</KeyDescriptor>
+
+						<KeyDescriptor use="signing">
+							<KeyInfo xmlns="http://www.w3.org/2000/09/xmldsig#">
+								<X509Data xmlns="http://www.w3.org/2000/09/xmldsig#">
+									<X509Certificate xmlns="http://www.w3.org/2000/09/xmldsig#"> MIICvDCCAaQCCQD6E8ZGsQ2usjANBgkqhkiG9w0BAQsFADAgMR4wHAYDVQQDDBVteXNlcnZpY2UuZXhhbXBsZS5jb20wHhcNMjIwMjE3MTQwNjM5WhcNMjMwMjE3MTQwNjM5WjAgMR4wHAYDVQQDDBVteXNlcnZpY2UuZXhhbXBsZS5jb20wggEiMA0GCSqGSIb3DQEBAQUAA4IBDwAwggEKAoIBAQC7XKdCRxUZXjdqVqwwwOJqc1Ch0nOSmk+UerkUqlviWHdeLR+FolHKjqLzCBloAz4xVc0DFfR76gWcWAHJloqZ7GBS7NpDhzV8G+cXQ+bTU0Lu2e73zCQb30XUdKhWiGfDKaU+1xg9CD/2gIfsYPs3TTq1sq7oCs5qLdUHaVL5kcRaHKdnTi7cs5i9xzs3TsUnXcrJPwydjp+aEkyRh07oMpXBEobGisfF2p1MA6pVW2gjmywf7D5iYEFELQhM7poqPN3/kfBvU1n7Lfgq7oxmv/8LFi4Zopr5nyqsz26XPtUy1WqTzgznAmP+nN0oBTERFVbXXdRa3k2v4cxTNPn/AgMBAAEwDQYJKoZIhvcNAQELBQADggEBAJYxROWSOZbOzXzafdGjQKsMgN948G/hHwVuZneyAcVoLMFTs1Weya9Z+snMp1u0AdDGmQTS9zGnD7syDYGOmgigOLcMvLMoWf5tCQBbEukW8O7DPjRR0XypChGSsHsqLGO0B0HaTel0HdP9Si827OCkc9Q+WbsFG/8/4ToGWL+ula1WuLawozoj8umPi9D8iXCoW35y2STU+WFQG7W+Kfdu+2CYz/0tGdwVqNG4WsfawWchrS00vGFKjm/fJc876gAfxiMH1I9fZvYSAxAZ3sVI//Ml2sUdgf067ywQ75oaLSS2NImmz5aos3vuWmOXhILd7iTU+BD8Uv6vWbI7I1M=</X509Certificate>
+								</X509Data>
+							</KeyInfo>
+						</KeyDescriptor>
+						<SingleLogoutService Binding="urn:oasis:names:tc:SAML:2.0:bindings:HTTP-POST" Location="http://localhost:8000/saml/slo" ResponseLocation="http://localhost:8000/saml/slo"></SingleLogoutService>
+					    <AssertionConsumerService Binding="urn:oasis:names:tc:SAML:2.0:bindings:HTTP-POST" Location="https://expected.acs.url" index="1"/>
+					    <AssertionConsumerService Binding="urn:oasis:names:tc:SAML:2.0:bindings:HTTP-POST" Location="https://fallback.acs.url" index="2"/>
+					  </SPSSODescriptor>
+					</EntityDescriptor>`),
+				},
+			},
+			res: res{
+				code: 303,
+				err:  false,
+			},
+		},
+		{
+			name: "redirect request with AssertionConsumerServiceIndex match",
+			args: args{
+				issuer:           "http://localhost:50002",
+				metadataEndpoint: "/saml/metadata",
+				config: &IdentityProviderConfig{
+					SignatureAlgorithm: dsig.RSASHA256SignatureMethod,
+					MetadataIDPConfig:  &MetadataIDPConfig{},
+					Endpoints: &EndpointConfig{
+						SingleSignOn: getEndpointPointer("/saml/SSO", "http://localhost:50002/saml/SSO"),
+					},
+				},
+				certificate: "-----BEGIN CERTIFICATE-----\nMIICvDCCAaQCCQD6E8ZGsQ2usjANBgkqhkiG9w0BAQsFADAgMR4wHAYDVQQDDBVt\neXNlcnZpY2UuZXhhbXBsZS5jb20wHhcNMjIwMjE3MTQwNjM5WhcNMjMwMjE3MTQw\nNjM5WjAgMR4wHAYDVQQDDBVteXNlcnZpY2UuZXhhbXBsZS5jb20wggEiMA0GCSqG\nSIb3DQEBAQUAA4IBDwAwggEKAoIBAQC7XKdCRxUZXjdqVqwwwOJqc1Ch0nOSmk+U\nerkUqlviWHdeLR+FolHKjqLzCBloAz4xVc0DFfR76gWcWAHJloqZ7GBS7NpDhzV8\nG+cXQ+bTU0Lu2e73zCQb30XUdKhWiGfDKaU+1xg9CD/2gIfsYPs3TTq1sq7oCs5q\nLdUHaVL5kcRaHKdnTi7cs5i9xzs3TsUnXcrJPwydjp+aEkyRh07oMpXBEobGisfF\n2p1MA6pVW2gjmywf7D5iYEFELQhM7poqPN3/kfBvU1n7Lfgq7oxmv/8LFi4Zopr5\nnyqsz26XPtUy1WqTzgznAmP+nN0oBTERFVbXXdRa3k2v4cxTNPn/AgMBAAEwDQYJ\nKoZIhvcNAQELBQADggEBAJYxROWSOZbOzXzafdGjQKsMgN948G/hHwVuZneyAcVo\nLMFTs1Weya9Z+snMp1u0AdDGmQTS9zGnD7syDYGOmgigOLcMvLMoWf5tCQBbEukW\n8O7DPjRR0XypChGSsHsqLGO0B0HaTel0HdP9Si827OCkc9Q+WbsFG/8/4ToGWL+u\nla1WuLawozoj8umPi9D8iXCoW35y2STU+WFQG7W+Kfdu+2CYz/0tGdwVqNG4Wsfa\nwWchrS00vGFKjm/fJc876gAfxiMH1I9fZvYSAxAZ3sVI//Ml2sUdgf067ywQ75oa\nLSS2NImmz5aos3vuWmOXhILd7iTU+BD8Uv6vWbI7I1M=\n-----END CERTIFICATE-----\n",
+				key:         "-----BEGIN PRIVATE KEY-----\nMIIEvQIBADANBgkqhkiG9w0BAQEFAASCBKcwggSjAgEAAoIBAQC7XKdCRxUZXjdq\nVqwwwOJqc1Ch0nOSmk+UerkUqlviWHdeLR+FolHKjqLzCBloAz4xVc0DFfR76gWc\nWAHJloqZ7GBS7NpDhzV8G+cXQ+bTU0Lu2e73zCQb30XUdKhWiGfDKaU+1xg9CD/2\ngIfsYPs3TTq1sq7oCs5qLdUHaVL5kcRaHKdnTi7cs5i9xzs3TsUnXcrJPwydjp+a\nEkyRh07oMpXBEobGisfF2p1MA6pVW2gjmywf7D5iYEFELQhM7poqPN3/kfBvU1n7\nLfgq7oxmv/8LFi4Zopr5nyqsz26XPtUy1WqTzgznAmP+nN0oBTERFVbXXdRa3k2v\n4cxTNPn/AgMBAAECggEAF+rV9yH30Ysza8GwrXCR9qDN1Dp3QmmsavnXkonEvPoq\nEr2T3o0//6mBp6CLDboMQGQBjblJwl+3Y6PgZolvHAMOsMdHfYNPEo7FSzUBzEw+\nqRrs5HkMyvoPgfV6X8F97W3tiD4Q/AmHkMILl+MxbnfPXM54gWqPuwIqxY1uaCk5\nREwyb7WBon3rd58ceOI1SLRjod6SbqWBMMSN3cJ+5VEPObFjw/RlhNQ5rBI8G5Kt\nso2zBU5C4BB2CvqlWy98WDKJkTvWHbiTjZCy8BQ+gQ6UJM2vaNELFOVpuMGQnMIi\noWiX10Jg2e1gP9j3TdrohlGF8M3+TXjSFKNmeX0DUQKBgQDx7UazUWS5RtkgnjH9\nw2xH2xkstJVD7nAS8VTxNwcrgjVXPvTJha9El904obUjyRX7ppb02tuH5ML/bZh6\n9lL4bP5+SHcJ10e4q8CK/KAGHD6BYAbaGXRq0CoSk5a3vv5XPdob4T5qKCIHFpnu\nMfbvdbEoameLOyRYOGu/yVZIiwKBgQDGQs7FRTisHV0xooiRmlvYF0dcd19qpLed\nqhgJNqBPOTEvvGvJNRoi39haEY3cuTqsxZ5FAlFlVFMUUozz+d0xBLLInoVY/Y4h\nhSdGmdw/A6oHodLqyEp3N5RZNdLlh8/nDS3xXzMotAl75bW5kc2ttcRhRdtyNJ9Z\nup0PgppO3QKBgEC45upAQz8iCiKkz+EA8C4FGqYQJcLHvmoC8GOcAioMqrKNoDVt\ns2cZbdChynEpcd0iQ058YrDnbZeiPWHgFnBp0Gf+gQI7+u8X2+oTDci0s7Au/YZJ\nuxB8YlUX8QF1clvqqzg8OVNzKy9UR5gm+9YyWVPjq5HfH6kOZx0nAxNjAoGAERt8\nqgsCC9/wxbKnpCC0oh3IG5N1WUdjTKh7sHfVN2DQ/LR+fHsniTDVg1gWbKBTDsty\nj7PWgC7ZiFxjKz45NtyX7LW4/efLFttdezsVhR500nnFMFseCdFy7Iu3afThHKfH\nehdj27RFSTqWBrAtFjsj+dzERcOCqIRwvwDe/cUCgYEA5+1mzVXDVjKsWylKJPk+\nZZA4LUfvmTj3VLNDZrlSAI/xEikCFio0QWEA2TQYTAwbXTrKwQSeHQRhv7OTc1h+\nMhpAgvs189ze5J4jiNmULEkkrO+Cxxnw8tyV+UFRZtzW9gUoVBwXiZ/Wbl9sfnlO\nwLJHc0j6OltPcPJmxHP8gQI=\n-----END PRIVATE KEY-----\n",
+				request: request{
+					ID:          "indexedAcsUrl",
+					Binding:     RedirectBinding,
+					SAMLRequest: url.QueryEscape(generateSAMLRequestWithACSIndex("1")),
+					RelayState:  url.QueryEscape("K6LS7mdqUO4SGedbfa8nBIyX-7K8gGbrHMqIMwVn6zCKLLoADHjEHUAm"),
+					Signature:   url.QueryEscape("AAH/iJbwDs09k5KQf2Qne4a39I4gVL4V4MHRsWDxPSpIH/IBVqG8qv3ZLNxCPQwwBgBIdT0HBcmzVrw60PMlGXFd52AR01+AyhvZ21Wz/ikUNisnI5EkNx2Ir9f7olk9GAfQr1Kp59WzRka6KczDYzi80f0fErc2oPHtb/5MEoZzXCyfJZ13X51a1tvtiEEL8hpy927CKR4nu/AF75WY5i/NQs55/OpZvrkc/KF/i6XK5I9rZP6Gj3WIpkJ2/SdKhKe/bw76B5c6sVR3VgO5/8ZQCydHTPKPNr+YrFaGLyWC9NDZWisD2O2q84jNCj/33xCKGoODi8VqhvCBuzndwg=="),
+					SigAlg:      url.QueryEscape("http://www.w3.org/2000/09/xmldsig#rsa-sha1"),
+				},
+				sp: sp{
+					entityID: "http://localhost:8000/saml/metadata",
+					metadata: compactXML(`<EntityDescriptor xmlns="urn:oasis:names:tc:SAML:2.0:metadata" entityID="http://localhost:8000/saml/metadata">
+					  <SPSSODescriptor xmlns="urn:oasis:names:tc:SAML:2.0:metadata" protocolSupportEnumeration="urn:oasis:names:tc:SAML:2.0:protocol" AuthnRequestsSigned="true" WantAssertionsSigned="true">
+					    <KeyDescriptor use="encryption">
+							<KeyInfo xmlns="http://www.w3.org/2000/09/xmldsig#">
+								<X509Data xmlns="http://www.w3.org/2000/09/xmldsig#">
+									<X509Certificate xmlns="http://www.w3.org/2000/09/xmldsig#"> MIICvDCCAaQCCQD6E8ZGsQ2usjANBgkqhkiG9w0BAQsFADAgMR4wHAYDVQQDDBVteXNlcnZpY2UuZXhhbXBsZS5jb20wHhcNMjIwMjE3MTQwNjM5WhcNMjMwMjE3MTQwNjM5WjAgMR4wHAYDVQQDDBVteXNlcnZpY2UuZXhhbXBsZS5jb20wggEiMA0GCSqGSIb3DQEBAQUAA4IBDwAwggEKAoIBAQC7XKdCRxUZXjdqVqwwwOJqc1Ch0nOSmk+UerkUqlviWHdeLR+FolHKjqLzCBloAz4xVc0DFfR76gWcWAHJloqZ7GBS7NpDhzV8G+cXQ+bTU0Lu2e73zCQb30XUdKhWiGfDKaU+1xg9CD/2gIfsYPs3TTq1sq7oCs5qLdUHaVL5kcRaHKdnTi7cs5i9xzs3TsUnXcrJPwydjp+aEkyRh07oMpXBEobGisfF2p1MA6pVW2gjmywf7D5iYEFELQhM7poqPN3/kfBvU1n7Lfgq7oxmv/8LFi4Zopr5nyqsz26XPtUy1WqTzgznAmP+nN0oBTERFVbXXdRa3k2v4cxTNPn/AgMBAAEwDQYJKoZIhvcNAQELBQADggEBAJYxROWSOZbOzXzafdGjQKsMgN948G/hHwVuZneyAcVoLMFTs1Weya9Z+snMp1u0AdDGmQTS9zGnD7syDYGOmgigOLcMvLMoWf5tCQBbEukW8O7DPjRR0XypChGSsHsqLGO0B0HaTel0HdP9Si827OCkc9Q+WbsFG/8/4ToGWL+ula1WuLawozoj8umPi9D8iXCoW35y2STU+WFQG7W+Kfdu+2CYz/0tGdwVqNG4WsfawWchrS00vGFKjm/fJc876gAfxiMH1I9fZvYSAxAZ3sVI//Ml2sUdgf067ywQ75oaLSS2NImmz5aos3vuWmOXhILd7iTU+BD8Uv6vWbI7I1M=</X509Certificate>
+								</X509Data>
+							</KeyInfo>
+							<EncryptionMethod Algorithm="http://www.w3.org/2001/04/xmlenc#aes128-cbc"></EncryptionMethod>
+							<EncryptionMethod Algorithm="http://www.w3.org/2001/04/xmlenc#aes192-cbc"></EncryptionMethod>
+							<EncryptionMethod Algorithm="http://www.w3.org/2001/04/xmlenc#aes256-cbc"></EncryptionMethod>
+							<EncryptionMethod Algorithm="http://www.w3.org/2001/04/xmlenc#rsa-oaep-mgf1p"></EncryptionMethod>
+						</KeyDescriptor>
+
+						<KeyDescriptor use="signing">
+							<KeyInfo xmlns="http://www.w3.org/2000/09/xmldsig#">
+								<X509Data xmlns="http://www.w3.org/2000/09/xmldsig#">
+									<X509Certificate xmlns="http://www.w3.org/2000/09/xmldsig#"> MIICvDCCAaQCCQD6E8ZGsQ2usjANBgkqhkiG9w0BAQsFADAgMR4wHAYDVQQDDBVteXNlcnZpY2UuZXhhbXBsZS5jb20wHhcNMjIwMjE3MTQwNjM5WhcNMjMwMjE3MTQwNjM5WjAgMR4wHAYDVQQDDBVteXNlcnZpY2UuZXhhbXBsZS5jb20wggEiMA0GCSqGSIb3DQEBAQUAA4IBDwAwggEKAoIBAQC7XKdCRxUZXjdqVqwwwOJqc1Ch0nOSmk+UerkUqlviWHdeLR+FolHKjqLzCBloAz4xVc0DFfR76gWcWAHJloqZ7GBS7NpDhzV8G+cXQ+bTU0Lu2e73zCQb30XUdKhWiGfDKaU+1xg9CD/2gIfsYPs3TTq1sq7oCs5qLdUHaVL5kcRaHKdnTi7cs5i9xzs3TsUnXcrJPwydjp+aEkyRh07oMpXBEobGisfF2p1MA6pVW2gjmywf7D5iYEFELQhM7poqPN3/kfBvU1n7Lfgq7oxmv/8LFi4Zopr5nyqsz26XPtUy1WqTzgznAmP+nN0oBTERFVbXXdRa3k2v4cxTNPn/AgMBAAEwDQYJKoZIhvcNAQELBQADggEBAJYxROWSOZbOzXzafdGjQKsMgN948G/hHwVuZneyAcVoLMFTs1Weya9Z+snMp1u0AdDGmQTS9zGnD7syDYGOmgigOLcMvLMoWf5tCQBbEukW8O7DPjRR0XypChGSsHsqLGO0B0HaTel0HdP9Si827OCkc9Q+WbsFG/8/4ToGWL+ula1WuLawozoj8umPi9D8iXCoW35y2STU+WFQG7W+Kfdu+2CYz/0tGdwVqNG4WsfawWchrS00vGFKjm/fJc876gAfxiMH1I9fZvYSAxAZ3sVI//Ml2sUdgf067ywQ75oaLSS2NImmz5aos3vuWmOXhILd7iTU+BD8Uv6vWbI7I1M=</X509Certificate>
+								</X509Data>
+							</KeyInfo>
+						</KeyDescriptor>
+						<SingleLogoutService Binding="urn:oasis:names:tc:SAML:2.0:bindings:HTTP-POST" Location="http://localhost:8000/saml/slo" ResponseLocation="http://localhost:8000/saml/slo"></SingleLogoutService>
+					    <AssertionConsumerService Binding="urn:oasis:names:tc:SAML:2.0:bindings:HTTP-POST" Location="https://indexed.acs.url" index="1"/>
+					    <AssertionConsumerService Binding="urn:oasis:names:tc:SAML:2.0:bindings:HTTP-POST" Location="https://fallback.acs.url" index="2"/>
+					  </SPSSODescriptor>
+					</EntityDescriptor>`),
+				},
+			},
+			res: res{
+				code: 303,
+				err:  false,
+			},
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -740,4 +909,60 @@ func idpStorageWithResponseCertAndSP(
 	mockStorage.EXPECT().CreateAuthRequest(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(request, nil).MinTimes(0).MaxTimes(1)
 
 	return mockStorage
+}
+
+func generateSAMLRequestWithACSUrl(acsUrl string) string {
+	return encodeSAMLRequestReadable(fmt.Sprintf(`<samlp:AuthnRequest xmlns:saml="urn:oasis:names:tc:SAML:2.0:assertion" xmlns:samlp="urn:oasis:names:tc:SAML:2.0:protocol" ID="id-c0e67fe32a31ffc0bcfe3499535909cf18be88e1" Version="2.0" IssueInstant="2022-04-26T09:47:45.495Z" Destination="http://localhost:50002/saml/SSO" AssertionConsumerServiceURL="%s" ProtocolBinding="urn:oasis:names:tc:SAML:2.0:bindings:HTTP-POST">
+    <saml:Issuer Format="urn:oasis:names:tc:SAML:2.0:nameid-format:entity">
+        http://localhost:8000/saml/metadata
+    </saml:Issuer>
+    <samlp:NameIDPolicy Format="urn:oasis:names:tc:SAML:2.0:nameid-format:transient" AllowCreate="true"/>
+</samlp:AuthnRequest>`, acsUrl))
+}
+
+func generateSAMLRequestWithACSIndex(index string) string {
+	return encodeSAMLRequestReadable(fmt.Sprintf(`<samlp:AuthnRequest xmlns:saml="urn:oasis:names:tc:SAML:2.0:assertion" xmlns:samlp="urn:oasis:names:tc:SAML:2.0:protocol" ID="id-c0e67fe32a31ffc0bcfe3499535909cf18be88e1" Version="2.0" IssueInstant="2022-04-26T09:47:45.495Z" Destination="http://localhost:50002/saml/SSO" AssertionConsumerServiceIndex="%s" ProtocolBinding="urn:oasis:names:tc:SAML:2.0:bindings:HTTP-POST">
+    <saml:Issuer Format="urn:oasis:names:tc:SAML:2.0:nameid-format:entity">
+        http://localhost:8000/saml/metadata
+    </saml:Issuer>
+    <samlp:NameIDPolicy Format="urn:oasis:names:tc:SAML:2.0:nameid-format:transient" AllowCreate="true"/>
+</samlp:AuthnRequest>`, index))
+}
+
+func deflateAndEncodeSAMLRequest(xml string) string {
+	var buf bytes.Buffer
+	// Raw deflate (no zlib headers)
+	w, _ := flate.NewWriter(&buf, flate.DefaultCompression)
+	_, _ = w.Write([]byte(xml))
+	w.Close()
+
+	// Base64 encode
+	return base64.StdEncoding.EncodeToString(buf.Bytes())
+}
+
+func compactXML(input string) string {
+	var b bytes.Buffer
+	inSpace := false
+	for _, r := range input {
+		switch r {
+		case '\n', '\r', '\t':
+			inSpace = true
+		case ' ':
+			if inSpace {
+				continue
+			}
+			b.WriteRune(' ')
+		default:
+			inSpace = false
+			b.WriteRune(r)
+		}
+	}
+	return b.String()
+}
+
+func encodeSAMLRequestReadable(xml string) string {
+	compact := compactXML(xml)
+	samlReq := deflateAndEncodeSAMLRequest(compact)
+
+	return samlReq
 }
