@@ -32,6 +32,7 @@ func (p *IdentityProvider) ssoHandleFunc(w http.ResponseWriter, r *http.Request)
 	var sp *serviceprovider.ServiceProvider
 	var authRequest models.AuthRequestInt
 	var err error
+	var acsIndex *int
 
 	response := &Response{
 		PostTemplate: p.postTemplate,
@@ -171,7 +172,18 @@ func (p *IdentityProvider) ssoHandleFunc(w http.ResponseWriter, r *http.Request)
 	// work out used acs url and protocolbinding for response
 	checkerInstance.WithValueStep(
 		func() {
-			response.AcsUrl, response.ProtocolBinding = GetAcsUrlAndBindingForResponse(sp.Metadata.SPSSODescriptor.AssertionConsumerService, authNRequest.ProtocolBinding)
+			if authNRequest.AssertionConsumerServiceIndex != "" {
+				if i, err := strconv.Atoi(authNRequest.AssertionConsumerServiceIndex); err == nil {
+					acsIndex = &i
+				}
+			}
+
+			response.AcsUrl, response.ProtocolBinding = GetAcsUrlAndBindingForResponse(
+				sp.Metadata.SPSSODescriptor.AssertionConsumerService,
+				authNRequest.ProtocolBinding,
+				authNRequest.AssertionConsumerServiceURL,
+				acsIndex,
+			)
 		},
 	)
 
@@ -354,39 +366,69 @@ func checkCertificate(
 func GetAcsUrlAndBindingForResponse(
 	acs []md.IndexedEndpointType,
 	requestProtocolBinding string,
+	requestAcsUrl string,
+	requestAcsIndex *int,
 ) (string, string) {
+	// Step 1: If ACS URL is specified, prefer exact match by URL + Binding
+	if requestAcsUrl != "" {
+		for _, ac := range acs {
+			if ac.Binding == requestProtocolBinding && ac.Location == requestAcsUrl {
+				return ac.Location, ac.Binding
+			}
+		}
+	}
+
+	// Step 2: If ACS Index is specified, match it
+	if requestAcsIndex != nil {
+		for _, ac := range acs {
+			i, err := strconv.Atoi(ac.Index)
+			if err != nil {
+				continue
+			}
+			if i == *requestAcsIndex {
+				return ac.Location, ac.Binding
+			}
+		}
+	}
+
+	// Step 3: First match by binding
+	for _, ac := range acs {
+		if ac.Binding == requestProtocolBinding {
+			return ac.Location, ac.Binding
+		}
+	}
+
+	// Step 4: Match default ACS
+	for _, ac := range acs {
+		if ac.IsDefault == "true" {
+			return ac.Location, ac.Binding
+		}
+	}
+
+	// Step 5: Fallback to lowest index
 	acsUrl := ""
 	protocolBinding := ""
-
-	for _, acs := range acs {
-		if acs.Binding == requestProtocolBinding {
-			acsUrl = acs.Location
-			protocolBinding = acs.Binding
-			break
+	minIndex := -1
+	for _, ac := range acs {
+		i, err := strconv.Atoi(ac.Index)
+		if err != nil {
+			continue
+		}
+		if minIndex == -1 || i < minIndex {
+			minIndex = i
+			acsUrl = ac.Location
+			protocolBinding = ac.Binding
 		}
 	}
-	if acsUrl == "" {
-		isDefaultFound := false
-		for _, acs := range acs {
-			if acs.IsDefault == "true" {
-				isDefaultFound = true
-				acsUrl = acs.Location
-				protocolBinding = acs.Binding
-				break
-			}
-		}
-		if !isDefaultFound {
-			index := 0
-			for _, acs := range acs {
-				i, _ := strconv.Atoi(acs.Index)
-				if index == 0 || i < index {
-					acsUrl = acs.Location
-					protocolBinding = acs.Binding
-					index = i
-				}
-			}
-		}
+	if acsUrl != "" && protocolBinding != "" {
+		return acsUrl, protocolBinding
 	}
 
-	return acsUrl, protocolBinding
+	// Step 6: Fallback to first ACS entry (if any)
+	if len(acs) > 0 {
+		return acs[0].Location, acs[0].Binding
+	}
+
+	// Nothing matched
+	return "", ""
 }
