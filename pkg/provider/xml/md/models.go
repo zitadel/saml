@@ -150,27 +150,31 @@ type SSODescriptorType struct {
 }
 
 type IDPSSODescriptorType struct {
-	XMLName                    xml.Name                `xml:"urn:oasis:names:tc:SAML:2.0:metadata IDPSSODescriptor"`
-	WantAuthnRequestsSigned    string                  `xml:"WantAuthnRequestsSigned,attr,omitempty"`
-	Id                         string                  `xml:"ID,attr,omitempty"`
-	ValidUntil                 string                  `xml:"validUntil,attr,omitempty"`
-	CacheDuration              string                  `xml:"cacheDuration,attr,omitempty"`
-	ProtocolSupportEnumeration AnyURIListType          `xml:"protocolSupportEnumeration,attr"`
-	ErrorURL                   string                  `xml:"errorURL,attr,omitempty"`
-	SingleSignOnService        []EndpointType          `xml:"urn:oasis:names:tc:SAML:2.0:metadata SingleSignOnService"`
-	NameIDMappingService       []EndpointType          `xml:"urn:oasis:names:tc:SAML:2.0:metadata NameIDMappingService"`
-	AssertionIDRequestService  []EndpointType          `xml:"urn:oasis:names:tc:SAML:2.0:metadata AssertionIDRequestService"`
-	AttributeProfile           []string                `xml:"AttributeProfile"`
-	Attribute                  []*saml.AttributeType   `xml:"Attribute"`
-	ArtifactResolutionService  []IndexedEndpointType   `xml:"urn:oasis:names:tc:SAML:2.0:metadata ArtifactResolutionService"`
-	SingleLogoutService        []EndpointType          `xml:"urn:oasis:names:tc:SAML:2.0:metadata SingleLogoutService"`
-	ManageNameIDService        []EndpointType          `xml:"urn:oasis:names:tc:SAML:2.0:metadata ManageNameIDService"`
-	NameIDFormat               []string                `xml:"NameIDFormat"`
-	Signature                  *xml_dsig.SignatureType `xml:"Signature"`
-	Extensions                 *ExtensionsType         `xml:"Extensions"`
-	KeyDescriptor              []KeyDescriptorType     `xml:"KeyDescriptor"`
-	Organization               *OrganizationType       `xml:"Organization"`
-	ContactPerson              []ContactType           `xml:"ContactPerson"`
+	XMLName                    xml.Name       `xml:"urn:oasis:names:tc:SAML:2.0:metadata IDPSSODescriptor"`
+	WantAuthnRequestsSigned    string         `xml:"WantAuthnRequestsSigned,attr,omitempty"`
+	Id                         string         `xml:"ID,attr,omitempty"`
+	ValidUntil                 string         `xml:"validUntil,attr,omitempty"`
+	CacheDuration              string         `xml:"cacheDuration,attr,omitempty"`
+	ProtocolSupportEnumeration AnyURIListType `xml:"protocolSupportEnumeration,attr"`
+	ErrorURL                   string         `xml:"errorURL,attr,omitempty"`
+
+	// DO NOT CHANGE THE ORDER OF THESE PARAMS.
+	// See https://groups.oasis-open.org/higherlogic/ws/public/download/51890/SAML%20MD%20simplified%20overview.pdf/latest chapter 2.10
+	Extensions                *ExtensionsType       `xml:"Extensions"`
+	KeyDescriptor             []KeyDescriptorType   `xml:"KeyDescriptor"`
+	ArtifactResolutionService []IndexedEndpointType `xml:"urn:oasis:names:tc:SAML:2.0:metadata ArtifactResolutionService"`
+	SingleLogoutService       []EndpointType        `xml:"urn:oasis:names:tc:SAML:2.0:metadata SingleLogoutService"`
+	NameIDFormat              []string              `xml:"NameIDFormat"`
+	SingleSignOnService       []EndpointType        `xml:"urn:oasis:names:tc:SAML:2.0:metadata SingleSignOnService"`
+
+	NameIDMappingService      []EndpointType          `xml:"urn:oasis:names:tc:SAML:2.0:metadata NameIDMappingService"`
+	AssertionIDRequestService []EndpointType          `xml:"urn:oasis:names:tc:SAML:2.0:metadata AssertionIDRequestService"`
+	AttributeProfile          []string                `xml:"AttributeProfile"`
+	Attribute                 []*saml.AttributeType   `xml:"Attribute"`
+	ManageNameIDService       []EndpointType          `xml:"urn:oasis:names:tc:SAML:2.0:metadata ManageNameIDService"`
+	Signature                 *xml_dsig.SignatureType `xml:"Signature"`
+	Organization              *OrganizationType       `xml:"Organization"`
+	ContactPerson             []ContactType           `xml:"ContactPerson"`
 	//InnerXml                   string                  `xml:",innerxml"`
 }
 
