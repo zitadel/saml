@@ -25,7 +25,7 @@ func TestSSO_getAcsUrlAndBindingForResponse(t *testing.T) {
 		binding string
 	}
 	type args struct {
-		sp             *serviceprovider.ServiceProvider
+		acs            []md.IndexedEndpointType
 		requestBinding string
 	}
 	tests := []struct {
@@ -35,15 +35,9 @@ func TestSSO_getAcsUrlAndBindingForResponse(t *testing.T) {
 	}{{
 		"sp with post and redirect, default used",
 		args{
-			&serviceprovider.ServiceProvider{
-				Metadata: &md.EntityDescriptorType{
-					SPSSODescriptor: &md.SPSSODescriptorType{
-						AssertionConsumerService: []md.IndexedEndpointType{
-							{Index: "1", IsDefault: "true", Binding: RedirectBinding, Location: "redirect"},
-							{Index: "2", Binding: PostBinding, Location: "post"},
-						},
-					},
-				},
+			[]md.IndexedEndpointType{
+				{Index: "1", IsDefault: "true", Binding: RedirectBinding, Location: "redirect"},
+				{Index: "2", Binding: PostBinding, Location: "post"},
 			},
 			RedirectBinding,
 		},
@@ -55,15 +49,9 @@ func TestSSO_getAcsUrlAndBindingForResponse(t *testing.T) {
 		{
 			"sp with post and redirect, first index used",
 			args{
-				&serviceprovider.ServiceProvider{
-					Metadata: &md.EntityDescriptorType{
-						SPSSODescriptor: &md.SPSSODescriptorType{
-							AssertionConsumerService: []md.IndexedEndpointType{
-								{Index: "1", Binding: RedirectBinding, Location: "redirect"},
-								{Index: "2", Binding: PostBinding, Location: "post"},
-							},
-						},
-					},
+				[]md.IndexedEndpointType{
+					{Index: "1", Binding: RedirectBinding, Location: "redirect"},
+					{Index: "2", Binding: PostBinding, Location: "post"},
 				},
 				RedirectBinding,
 			},
@@ -75,15 +63,9 @@ func TestSSO_getAcsUrlAndBindingForResponse(t *testing.T) {
 		{
 			"sp with post and redirect, redirect used",
 			args{
-				&serviceprovider.ServiceProvider{
-					Metadata: &md.EntityDescriptorType{
-						SPSSODescriptor: &md.SPSSODescriptorType{
-							AssertionConsumerService: []md.IndexedEndpointType{
-								{Binding: RedirectBinding, Location: "redirect"},
-								{Binding: PostBinding, Location: "post"},
-							},
-						},
-					},
+				[]md.IndexedEndpointType{
+					{Binding: RedirectBinding, Location: "redirect"},
+					{Binding: PostBinding, Location: "post"},
 				},
 				RedirectBinding,
 			},
@@ -95,15 +77,9 @@ func TestSSO_getAcsUrlAndBindingForResponse(t *testing.T) {
 		{
 			"sp with post and redirect, post used",
 			args{
-				&serviceprovider.ServiceProvider{
-					Metadata: &md.EntityDescriptorType{
-						SPSSODescriptor: &md.SPSSODescriptorType{
-							AssertionConsumerService: []md.IndexedEndpointType{
-								{Binding: RedirectBinding, Location: "redirect"},
-								{Binding: PostBinding, Location: "post"},
-							},
-						},
-					},
+				[]md.IndexedEndpointType{
+					{Binding: RedirectBinding, Location: "redirect"},
+					{Binding: PostBinding, Location: "post"},
 				},
 				PostBinding,
 			},
@@ -114,16 +90,9 @@ func TestSSO_getAcsUrlAndBindingForResponse(t *testing.T) {
 		},
 		{
 			"sp with redirect, post used",
-			args{
-				&serviceprovider.ServiceProvider{
-					Metadata: &md.EntityDescriptorType{
-						SPSSODescriptor: &md.SPSSODescriptorType{
-							AssertionConsumerService: []md.IndexedEndpointType{
-								{Binding: RedirectBinding, Location: "redirect"},
-							},
-						},
-					},
-				},
+			args{[]md.IndexedEndpointType{
+				{Binding: RedirectBinding, Location: "redirect"},
+			},
 				PostBinding,
 			},
 			res{
@@ -134,14 +103,8 @@ func TestSSO_getAcsUrlAndBindingForResponse(t *testing.T) {
 		{
 			"sp with post, redirect used",
 			args{
-				&serviceprovider.ServiceProvider{
-					Metadata: &md.EntityDescriptorType{
-						SPSSODescriptor: &md.SPSSODescriptorType{
-							AssertionConsumerService: []md.IndexedEndpointType{
-								{Binding: PostBinding, Location: "post"},
-							},
-						},
-					},
+				[]md.IndexedEndpointType{
+					{Binding: PostBinding, Location: "post"},
 				},
 				RedirectBinding,
 			},
@@ -153,9 +116,9 @@ func TestSSO_getAcsUrlAndBindingForResponse(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			acs, binding := getAcsUrlAndBindingForResponse(tt.args.sp, tt.args.requestBinding)
+			acs, binding := GetAcsUrlAndBindingForResponse(tt.args.acs, tt.args.requestBinding)
 			if acs != tt.res.acs && binding != tt.res.binding {
-				t.Errorf("getAcsUrlAndBindingForResponse() got = %v/%v, want %v/%v", acs, binding, tt.res.acs, tt.res.binding)
+				t.Errorf("GetAcsUrlAndBindingForResponse() got = %v/%v, want %v/%v", acs, binding, tt.res.acs, tt.res.binding)
 				return
 			}
 		})
@@ -447,9 +410,11 @@ func TestSSO_ssoHandleFunc(t *testing.T) {
 		Binding      string
 	}
 	type res struct {
-		code  int
-		err   bool
-		state string
+		code    int
+		err     bool
+		state   string
+		inflate bool
+		b64     bool
 	}
 	type sp struct {
 		entityID string
@@ -629,39 +594,6 @@ func TestSSO_ssoHandleFunc(t *testing.T) {
 				err:   false,
 			}},
 		{
-			"redirect request unknown service provider",
-			args{
-				issuer:           "http://localhost:50002",
-				metadataEndpoint: "/saml/metadata",
-				config: &IdentityProviderConfig{
-					SignatureAlgorithm: dsig.RSASHA256SignatureMethod,
-					MetadataIDPConfig:  &MetadataIDPConfig{},
-					Endpoints: &EndpointConfig{
-						SingleSignOn: getEndpointPointer("/saml/SSO", "http://localhost:50002/saml/SSO"),
-					},
-				},
-				certificate: "-----BEGIN CERTIFICATE-----\nMIICvDCCAaQCCQD6E8ZGsQ2usjANBgkqhkiG9w0BAQsFADAgMR4wHAYDVQQDDBVt\neXNlcnZpY2UuZXhhbXBsZS5jb20wHhcNMjIwMjE3MTQwNjM5WhcNMjMwMjE3MTQw\nNjM5WjAgMR4wHAYDVQQDDBVteXNlcnZpY2UuZXhhbXBsZS5jb20wggEiMA0GCSqG\nSIb3DQEBAQUAA4IBDwAwggEKAoIBAQC7XKdCRxUZXjdqVqwwwOJqc1Ch0nOSmk+U\nerkUqlviWHdeLR+FolHKjqLzCBloAz4xVc0DFfR76gWcWAHJloqZ7GBS7NpDhzV8\nG+cXQ+bTU0Lu2e73zCQb30XUdKhWiGfDKaU+1xg9CD/2gIfsYPs3TTq1sq7oCs5q\nLdUHaVL5kcRaHKdnTi7cs5i9xzs3TsUnXcrJPwydjp+aEkyRh07oMpXBEobGisfF\n2p1MA6pVW2gjmywf7D5iYEFELQhM7poqPN3/kfBvU1n7Lfgq7oxmv/8LFi4Zopr5\nnyqsz26XPtUy1WqTzgznAmP+nN0oBTERFVbXXdRa3k2v4cxTNPn/AgMBAAEwDQYJ\nKoZIhvcNAQELBQADggEBAJYxROWSOZbOzXzafdGjQKsMgN948G/hHwVuZneyAcVo\nLMFTs1Weya9Z+snMp1u0AdDGmQTS9zGnD7syDYGOmgigOLcMvLMoWf5tCQBbEukW\n8O7DPjRR0XypChGSsHsqLGO0B0HaTel0HdP9Si827OCkc9Q+WbsFG/8/4ToGWL+u\nla1WuLawozoj8umPi9D8iXCoW35y2STU+WFQG7W+Kfdu+2CYz/0tGdwVqNG4Wsfa\nwWchrS00vGFKjm/fJc876gAfxiMH1I9fZvYSAxAZ3sVI//Ml2sUdgf067ywQ75oa\nLSS2NImmz5aos3vuWmOXhILd7iTU+BD8Uv6vWbI7I1M=\n-----END CERTIFICATE-----\n",
-				key:         "-----BEGIN PRIVATE KEY-----\nMIIEvQIBADANBgkqhkiG9w0BAQEFAASCBKcwggSjAgEAAoIBAQC7XKdCRxUZXjdq\nVqwwwOJqc1Ch0nOSmk+UerkUqlviWHdeLR+FolHKjqLzCBloAz4xVc0DFfR76gWc\nWAHJloqZ7GBS7NpDhzV8G+cXQ+bTU0Lu2e73zCQb30XUdKhWiGfDKaU+1xg9CD/2\ngIfsYPs3TTq1sq7oCs5qLdUHaVL5kcRaHKdnTi7cs5i9xzs3TsUnXcrJPwydjp+a\nEkyRh07oMpXBEobGisfF2p1MA6pVW2gjmywf7D5iYEFELQhM7poqPN3/kfBvU1n7\nLfgq7oxmv/8LFi4Zopr5nyqsz26XPtUy1WqTzgznAmP+nN0oBTERFVbXXdRa3k2v\n4cxTNPn/AgMBAAECggEAF+rV9yH30Ysza8GwrXCR9qDN1Dp3QmmsavnXkonEvPoq\nEr2T3o0//6mBp6CLDboMQGQBjblJwl+3Y6PgZolvHAMOsMdHfYNPEo7FSzUBzEw+\nqRrs5HkMyvoPgfV6X8F97W3tiD4Q/AmHkMILl+MxbnfPXM54gWqPuwIqxY1uaCk5\nREwyb7WBon3rd58ceOI1SLRjod6SbqWBMMSN3cJ+5VEPObFjw/RlhNQ5rBI8G5Kt\nso2zBU5C4BB2CvqlWy98WDKJkTvWHbiTjZCy8BQ+gQ6UJM2vaNELFOVpuMGQnMIi\noWiX10Jg2e1gP9j3TdrohlGF8M3+TXjSFKNmeX0DUQKBgQDx7UazUWS5RtkgnjH9\nw2xH2xkstJVD7nAS8VTxNwcrgjVXPvTJha9El904obUjyRX7ppb02tuH5ML/bZh6\n9lL4bP5+SHcJ10e4q8CK/KAGHD6BYAbaGXRq0CoSk5a3vv5XPdob4T5qKCIHFpnu\nMfbvdbEoameLOyRYOGu/yVZIiwKBgQDGQs7FRTisHV0xooiRmlvYF0dcd19qpLed\nqhgJNqBPOTEvvGvJNRoi39haEY3cuTqsxZ5FAlFlVFMUUozz+d0xBLLInoVY/Y4h\nhSdGmdw/A6oHodLqyEp3N5RZNdLlh8/nDS3xXzMotAl75bW5kc2ttcRhRdtyNJ9Z\nup0PgppO3QKBgEC45upAQz8iCiKkz+EA8C4FGqYQJcLHvmoC8GOcAioMqrKNoDVt\ns2cZbdChynEpcd0iQ058YrDnbZeiPWHgFnBp0Gf+gQI7+u8X2+oTDci0s7Au/YZJ\nuxB8YlUX8QF1clvqqzg8OVNzKy9UR5gm+9YyWVPjq5HfH6kOZx0nAxNjAoGAERt8\nqgsCC9/wxbKnpCC0oh3IG5N1WUdjTKh7sHfVN2DQ/LR+fHsniTDVg1gWbKBTDsty\nj7PWgC7ZiFxjKz45NtyX7LW4/efLFttdezsVhR500nnFMFseCdFy7Iu3afThHKfH\nehdj27RFSTqWBrAtFjsj+dzERcOCqIRwvwDe/cUCgYEA5+1mzVXDVjKsWylKJPk+\nZZA4LUfvmTj3VLNDZrlSAI/xEikCFio0QWEA2TQYTAwbXTrKwQSeHQRhv7OTc1h+\nMhpAgvs189ze5J4jiNmULEkkrO+Cxxnw8tyV+UFRZtzW9gUoVBwXiZ/Wbl9sfnlO\nwLJHc0j6OltPcPJmxHP8gQI=\n-----END PRIVATE KEY-----\n",
-				request: request{
-					ID:          "test",
-					Binding:     RedirectBinding,
-					SAMLRequest: url.QueryEscape("nJJBj9MwEIX/ijX3NG6a7DbWJlLZClFpYatN4cBt6k6oJccungmw/x61XaQioRy42vP5ved5D4yDP5nVKMfwQt9HYlG/Bh/YnC8aGFMwEdmxCTgQG7GmW318MsVMG2SmJC4GuEFO08wpRYk2elCbdQPukFlNd/c9LQpczPve6r3taVHWdbWoal3bfr7c03JJc1BfKLGLoYFipkFtmEfaBBYM0kChiyLTZVbc7XRtyntTVrOyrr6CWhOLCygX8ihyMnnuo0V/jCym0loX+dl33nXPoFZ/Ij3GwONAqaP0w1n6/PL0D3qptb7CaBnU9i3bOxcOLnyb/oj9dYjNh91um22fux20l2WYS7Kk3sc0oEw/cj5xh6y/jBoK4uQV2gmfAwkeUPAhv5Fq30rwCQfarLfRO/v6H/KSMLCjIKBW3sefj4lQqAFJI0HeXiX/rlr7OwAA//8="),
-					RelayState:  url.QueryEscape("K6LS7mdqUO4SGedbfa8nBIyX-7K8gGbrHMqIMwVn6zCKLLoADHjEHUAm"),
-					Signature:   url.QueryEscape("PWZ6JPNpAGE7mYLKD3dCUG9AZcThrMRQGtvdv31ewx3hms5Oglc677iAUEcbIBrvKtMrCPVwXPNxT6wQ0rg4qIgyKgoyS53ZTaxaFHPrB7wkkzqtK7GvWgdEqceT8iooK5SCLHFMJ3m30LqEbX7zFw62yE34+e7ypfZSM5Lrf0QFwPzX+LNCuYA+Ob9D5SKc132tn21J2vBRmNJ1zCY0ksRzQfyfErjAzcGVx8qK9jpaeyvsVBZSkH/I6+1hb8lQWE48xala9NbqfbMATGBCQj1UvpVMMfp6PE7KPk5Y1YDeSqPeRIEKH+Gnip6Hve5Ji1aiRp5bytVf1VHwTHSq8w=="),
-					SigAlg:      url.QueryEscape("http://www.w3.org/2000/09/xmldsig#rsa-sha1"),
-				},
-				sp: sp{
-					entityID: "http://localhost:8000/saml/metadata",
-					metadata: "<EntityDescriptor xmlns=\"urn:oasis:names:tc:SAML:2.0:metadata\" validUntil=\"2022-04-28T11:32:04.797Z\" entityID=\"http://localhost:8000/saml/metadata\">\n  <SPSSODescriptor xmlns=\"urn:oasis:names:tc:SAML:2.0:metadata\" validUntil=\"2022-04-28T11:32:04.796923Z\" protocolSupportEnumeration=\"urn:oasis:names:tc:SAML:2.0:protocol\" AuthnRequestsSigned=\"true\" WantAssertionsSigned=\"true\">\n    <KeyDescriptor use=\"encryption\">\n      <KeyInfo xmlns=\"http://www.w3.org/2000/09/xmldsig#\">\n        <X509Data xmlns=\"http://www.w3.org/2000/09/xmldsig#\">\n          <X509Certificate xmlns=\"http://www.w3.org/2000/09/xmldsig#\">MIICvDCCAaQCCQD6E8ZGsQ2usjANBgkqhkiG9w0BAQsFADAgMR4wHAYDVQQDDBVteXNlcnZpY2UuZXhhbXBsZS5jb20wHhcNMjIwMjE3MTQwNjM5WhcNMjMwMjE3MTQwNjM5WjAgMR4wHAYDVQQDDBVteXNlcnZpY2UuZXhhbXBsZS5jb20wggEiMA0GCSqGSIb3DQEBAQUAA4IBDwAwggEKAoIBAQC7XKdCRxUZXjdqVqwwwOJqc1Ch0nOSmk+UerkUqlviWHdeLR+FolHKjqLzCBloAz4xVc0DFfR76gWcWAHJloqZ7GBS7NpDhzV8G+cXQ+bTU0Lu2e73zCQb30XUdKhWiGfDKaU+1xg9CD/2gIfsYPs3TTq1sq7oCs5qLdUHaVL5kcRaHKdnTi7cs5i9xzs3TsUnXcrJPwydjp+aEkyRh07oMpXBEobGisfF2p1MA6pVW2gjmywf7D5iYEFELQhM7poqPN3/kfBvU1n7Lfgq7oxmv/8LFi4Zopr5nyqsz26XPtUy1WqTzgznAmP+nN0oBTERFVbXXdRa3k2v4cxTNPn/AgMBAAEwDQYJKoZIhvcNAQELBQADggEBAJYxROWSOZbOzXzafdGjQKsMgN948G/hHwVuZneyAcVoLMFTs1Weya9Z+snMp1u0AdDGmQTS9zGnD7syDYGOmgigOLcMvLMoWf5tCQBbEukW8O7DPjRR0XypChGSsHsqLGO0B0HaTel0HdP9Si827OCkc9Q+WbsFG/8/4ToGWL+ula1WuLawozoj8umPi9D8iXCoW35y2STU+WFQG7W+Kfdu+2CYz/0tGdwVqNG4WsfawWchrS00vGFKjm/fJc876gAfxiMH1I9fZvYSAxAZ3sVI//Ml2sUdgf067ywQ75oaLSS2NImmz5aos3vuWmOXhILd7iTU+BD8Uv6vWbI7I1M=</X509Certificate>\n        </X509Data>\n      </KeyInfo>\n      <EncryptionMethod Algorithm=\"http://www.w3.org/2001/04/xmlenc#aes128-cbc\"></EncryptionMethod>\n      <EncryptionMethod Algorithm=\"http://www.w3.org/2001/04/xmlenc#aes192-cbc\"></EncryptionMethod>\n      <EncryptionMethod Algorithm=\"http://www.w3.org/2001/04/xmlenc#aes256-cbc\"></EncryptionMethod>\n      <EncryptionMethod Algorithm=\"http://www.w3.org/2001/04/xmlenc#rsa-oaep-mgf1p\"></EncryptionMethod>\n    </KeyDescriptor>\n    <KeyDescriptor use=\"signing\">\n      <KeyInfo xmlns=\"http://www.w3.org/2000/09/xmldsig#\">\n        <X509Data xmlns=\"http://www.w3.org/2000/09/xmldsig#\">\n          <X509Certificate xmlns=\"http://www.w3.org/2000/09/xmldsig#\">MIICvDCCAaQCCQD6E8ZGsQ2usjANBgkqhkiG9w0BAQsFADAgMR4wHAYDVQQDDBVteXNlcnZpY2UuZXhhbXBsZS5jb20wHhcNMjIwMjE3MTQwNjM5WhcNMjMwMjE3MTQwNjM5WjAgMR4wHAYDVQQDDBVteXNlcnZpY2UuZXhhbXBsZS5jb20wggEiMA0GCSqGSIb3DQEBAQUAA4IBDwAwggEKAoIBAQC7XKdCRxUZXjdqVqwwwOJqc1Ch0nOSmk+UerkUqlviWHdeLR+FolHKjqLzCBloAz4xVc0DFfR76gWcWAHJloqZ7GBS7NpDhzV8G+cXQ+bTU0Lu2e73zCQb30XUdKhWiGfDKaU+1xg9CD/2gIfsYPs3TTq1sq7oCs5qLdUHaVL5kcRaHKdnTi7cs5i9xzs3TsUnXcrJPwydjp+aEkyRh07oMpXBEobGisfF2p1MA6pVW2gjmywf7D5iYEFELQhM7poqPN3/kfBvU1n7Lfgq7oxmv/8LFi4Zopr5nyqsz26XPtUy1WqTzgznAmP+nN0oBTERFVbXXdRa3k2v4cxTNPn/AgMBAAEwDQYJKoZIhvcNAQELBQADggEBAJYxROWSOZbOzXzafdGjQKsMgN948G/hHwVuZneyAcVoLMFTs1Weya9Z+snMp1u0AdDGmQTS9zGnD7syDYGOmgigOLcMvLMoWf5tCQBbEukW8O7DPjRR0XypChGSsHsqLGO0B0HaTel0HdP9Si827OCkc9Q+WbsFG/8/4ToGWL+ula1WuLawozoj8umPi9D8iXCoW35y2STU+WFQG7W+Kfdu+2CYz/0tGdwVqNG4WsfawWchrS00vGFKjm/fJc876gAfxiMH1I9fZvYSAxAZ3sVI//Ml2sUdgf067ywQ75oaLSS2NImmz5aos3vuWmOXhILd7iTU+BD8Uv6vWbI7I1M=</X509Certificate>\n        </X509Data>\n      </KeyInfo>\n    </KeyDescriptor>\n    <SingleLogoutService Binding=\"urn:oasis:names:tc:SAML:2.0:bindings:HTTP-POST\" Location=\"http://localhost:8000/saml/slo\" ResponseLocation=\"http://localhost:8000/saml/slo\"></SingleLogoutService>\n    <AssertionConsumerService Binding=\"urn:oasis:names:tc:SAML:2.0:bindings:HTTP-POST\" Location=\"http://localhost:8000/saml/acs\" index=\"1\"></AssertionConsumerService>\n    <AssertionConsumerService Binding=\"urn:oasis:names:tc:SAML:2.0:bindings:HTTP-Artifact\" Location=\"http://localhost:8000/saml/acs\" index=\"2\"></AssertionConsumerService>\n  </SPSSODescriptor>\n</EntityDescriptor>",
-					err:      fmt.Errorf("unknown"),
-				},
-			},
-			res{
-				code:  200,
-				state: StatusCodeRequestDenied,
-				err:   false,
-			}},
-		{
 			"signed post request",
 			args{
 				issuer:           "http://localhost:8080",
@@ -693,11 +625,10 @@ func TestSSO_ssoHandleFunc(t *testing.T) {
 				err:  false,
 			}},
 	}
-
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			endpoint := NewEndpoint(tt.args.metadataEndpoint)
-			spInst, err := serviceprovider.NewServiceProvider(tt.args.sp.entityID, &serviceprovider.Config{Metadata: []byte(tt.args.sp.metadata)}, "")
+			spInst, err := serviceprovider.NewServiceProvider(tt.args.sp.entityID, &serviceprovider.Config{Metadata: []byte(tt.args.sp.metadata)}, func(s string) string { return "" })
 			if err != nil {
 				t.Errorf("error while creating service provider")
 				return
@@ -717,7 +648,7 @@ func TestSSO_ssoHandleFunc(t *testing.T) {
 				return
 			}
 
-			idp, err := NewIdentityProvider(endpoint, tt.args.config, mockStorage)
+			idp, err := newTestIdentityProvider(endpoint, tt.args.config, mockStorage)
 			if (err != nil) != tt.res.err {
 				t.Errorf("NewIdentityProvider() error = %v", err.Error())
 				return
@@ -766,7 +697,7 @@ func TestSSO_ssoHandleFunc(t *testing.T) {
 			}
 
 			if tt.res.state != "" {
-				if err := parseForState(string(response), tt.res.state); err != nil {
+				if err := parseForState(tt.res.inflate, tt.res.b64, string(response), tt.res.state); err != nil {
 					t.Errorf("ssoHandleFunc() response state not: %v", tt.res.state)
 					return
 				}
@@ -775,8 +706,13 @@ func TestSSO_ssoHandleFunc(t *testing.T) {
 	}
 }
 
-func parseForState(responseXML string, state string) error {
-	response, err := xml.DecodeResponse("", responseXML)
+func parseForState(inflate bool, b64 bool, responseXML string, state string) error {
+	encoding := ""
+	if inflate {
+		encoding = xml.EncodingDeflate
+	}
+
+	response, err := xml.DecodeResponse(encoding, b64, responseXML)
 	if err != nil {
 		return err
 	}

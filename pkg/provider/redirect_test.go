@@ -283,7 +283,7 @@ func TestRedirect_verifyRedirectSignature(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			spConfig := &serviceprovider.Config{Metadata: []byte(tt.args.spMetadata)}
 
-			sp, err := serviceprovider.NewServiceProvider("test", spConfig, "")
+			sp, err := serviceprovider.NewServiceProvider("test", spConfig, func(s string) string { return "" })
 			if err != nil {
 				t.Errorf("verifyRedirectSignature() got = %v, wanted to create service provider instance", err)
 				return
@@ -385,7 +385,7 @@ func TestRedirect_buildRedirectQuery(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := buildRedirectQuery(tt.args.response, tt.args.relayState, tt.args.sigAlg, tt.args.sig)
+			got := BuildRedirectQuery(tt.args.response, tt.args.relayState, tt.args.sigAlg, tt.args.sig)
 			if got != tt.res {
 				t.Errorf("verifyRedirectSignature() got = %v, want %v", got, tt.res)
 				return

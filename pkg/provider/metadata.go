@@ -36,8 +36,8 @@ func (p *Provider) metadataHandle(w http.ResponseWriter, r *http.Request) {
 }
 
 func (p *IdentityProviderConfig) getMetadata(
-	ctx context.Context,
 	entityID string,
+	issuer string,
 	idpCertData []byte,
 	timeFormat string,
 ) (*md.IDPSSODescriptorType, *md.AttributeAuthorityDescriptorType) {
@@ -99,10 +99,10 @@ func (p *IdentityProviderConfig) getMetadata(
 			SingleSignOnService: []md.EndpointType{
 				{
 					Binding:  RedirectBinding,
-					Location: endpoints.singleSignOnEndpoint.Absolute(IssuerFromContext(ctx)),
+					Location: endpoints.singleSignOnEndpoint.Absolute(issuer),
 				}, {
 					Binding:  PostBinding,
-					Location: endpoints.singleSignOnEndpoint.Absolute(IssuerFromContext(ctx)),
+					Location: endpoints.singleSignOnEndpoint.Absolute(issuer),
 				},
 			},
 			//TODO definition for more profiles
@@ -113,11 +113,11 @@ func (p *IdentityProviderConfig) getMetadata(
 			SingleLogoutService: []md.EndpointType{
 				{
 					Binding:  RedirectBinding,
-					Location: endpoints.singleLogoutEndpoint.Absolute(IssuerFromContext(ctx)),
+					Location: endpoints.singleLogoutEndpoint.Absolute(issuer),
 				},
 				{
 					Binding:  PostBinding,
-					Location: endpoints.singleLogoutEndpoint.Absolute(IssuerFromContext(ctx)),
+					Location: endpoints.singleLogoutEndpoint.Absolute(issuer),
 				},
 			},
 			NameIDFormat:  []string{"urn:oasis:names:tc:SAML:2.0:nameid-format:persistent"},
@@ -136,7 +136,7 @@ func (p *IdentityProviderConfig) getMetadata(
 			ErrorURL:                   p.MetadataIDPConfig.ErrorURL,
 			AttributeService: []md.EndpointType{{
 				Binding:  "urn:oasis:names:tc:SAML:2.0:bindings:SOAP",
-				Location: endpoints.attributeEndpoint.Absolute(IssuerFromContext(ctx)),
+				Location: endpoints.attributeEndpoint.Absolute(issuer),
 			}},
 			NameIDFormat: []string{"urn:oasis:names:tc:SAML:2.0:nameid-format:persistent"},
 			//TODO definition for more profiles

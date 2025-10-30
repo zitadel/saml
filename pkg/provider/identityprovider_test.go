@@ -170,7 +170,7 @@ func TestIDP_certificateHandleFunc(t *testing.T) {
 				return
 			}
 
-			idp, err := NewIdentityProvider(endpoint, tt.args.config, mockStorage)
+			idp, err := newTestIdentityProvider(endpoint, tt.args.config, mockStorage)
 			if (err != nil) != tt.res.err {
 				t.Errorf("NewIdentityProvider() error = %v", err.Error())
 				return
@@ -197,6 +197,14 @@ func TestIDP_certificateHandleFunc(t *testing.T) {
 			}
 		})
 	}
+}
+
+func newTestIdentityProvider(metadata Endpoint, conf *IdentityProviderConfig, storage IDPStorage) (_ *IdentityProvider, err error) {
+	idp, err := NewIdentityProvider(metadata, conf, storage)
+	if err != nil {
+		return nil, err
+	}
+	return idp, nil
 }
 
 func idpStorageWithResponseCert(t *testing.T, cert []byte, pKey []byte) *mock.MockIDPStorage {
@@ -238,9 +246,7 @@ func idpStorageWithResponseCert(t *testing.T, cert []byte, pKey []byte) *mock.Mo
 }
 
 func callHandlerFuncWithIssuerInterceptor(issuer string, w http.ResponseWriter, r *http.Request, handlerFunc func(w http.ResponseWriter, r *http.Request)) {
-	issuerFromRequest := func(r *http.Request) string {
-		return issuer
-	}
+	issuerFromRequest, _ := StaticIssuer(issuer)(true)
 	interceptor := NewIssuerInterceptor(issuerFromRequest)
 
 	intercepted := interceptor.HandlerFunc(handlerFunc)
