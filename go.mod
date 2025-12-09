@@ -11,7 +11,7 @@ require (
 	github.com/gorilla/mux v1.8.1
 	github.com/muhlemmer/httpforwarded v0.1.0
 	github.com/russellhaering/goxmldsig v1.4.0
-	github.com/stretchr/testify v1.10.0
+	github.com/stretchr/testify v1.11.1
 	github.com/zitadel/logging v0.6.2
 )
 
