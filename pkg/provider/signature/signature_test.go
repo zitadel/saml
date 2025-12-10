@@ -250,18 +250,18 @@ func TestSignature_ValidateRedirect(t *testing.T) {
 
 			certBytes, err := base64.StdEncoding.DecodeString(certStr)
 			if err != nil {
-				t.Errorf("failed to parse PEM block containing the public key")
+				t.Error("failed to parse PEM block containing the public key")
 				return
 			}
 			parsedCert, err := x509.ParseCertificate(certBytes)
 			if err != nil {
-				t.Errorf("failed to parse certificate: " + err.Error())
+				t.Errorf("failed to parse certificate: %v", err)
 				return
 			}
 
 			signatureValue, err := base64.StdEncoding.DecodeString(tt.args.sig)
 			if err != nil {
-				t.Errorf("failed to decode sig: " + err.Error())
+				t.Errorf("failed to decode sig: %v", err)
 				return
 			}
 

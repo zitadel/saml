@@ -13,7 +13,7 @@ import (
 	"github.com/zitadel/saml/pkg/provider/xml/samlp"
 )
 
-var (
+const (
 	StatusCodeSuccess                = "urn:oasis:names:tc:SAML:2.0:status:Success"
 	StatusCodeVersionMissmatch       = "urn:oasis:names:tc:SAML:2.0:status:VersionMismatch"
 	StatusCodeAuthNFailed            = "urn:oasis:names:tc:SAML:2.0:status:AuthnFailed"
