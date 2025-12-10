@@ -26,7 +26,7 @@ func ParseCertificates(certStrs []string) ([]*x509.Certificate, error) {
 		certStr = strings.TrimPrefix(strings.TrimSuffix(certStr, "-----ENDCERTIFICATE-----"), "-----BEGINCERTIFICATE-----")
 		certBytes, err := base64.StdEncoding.DecodeString(certStr)
 		if err != nil {
-			return nil, fmt.Errorf("failed to decode certificate:" + err.Error())
+			return nil, fmt.Errorf("failed to decode certificate: %v", err)
 		}
 		block, _ := pem.Decode(certBytes)
 		if block != nil {
@@ -34,7 +34,7 @@ func ParseCertificates(certStrs []string) ([]*x509.Certificate, error) {
 		}
 		parsedCert, err := x509.ParseCertificate(certBytes)
 		if err != nil {
-			return nil, fmt.Errorf("failed to parse certificate: " + err.Error())
+			return nil, fmt.Errorf("failed to parse certificate: %s", err)
 		}
 		certs[i] = parsedCert
 	}

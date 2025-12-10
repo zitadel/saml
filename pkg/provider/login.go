@@ -2,6 +2,7 @@ package provider
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net/http"
 
@@ -66,25 +67,25 @@ func (p *IdentityProvider) callbackHandleFunc(w http.ResponseWriter, r *http.Req
 func (p *IdentityProvider) loginResponse(ctx context.Context, authRequest models.AuthRequestInt, response *Response) (*samlp.ResponseType, error) {
 	if !authRequest.Done() {
 		logging.Error(StatusCodeAuthNFailed)
-		return nil, fmt.Errorf(StatusCodeAuthNFailed)
+		return nil, errors.New(StatusCodeAuthNFailed)
 	}
 
 	attrs := &Attributes{}
 	if err := p.storage.SetUserinfoWithUserID(ctx, authRequest.GetApplicationID(), attrs, authRequest.GetUserID(), []int{}); err != nil {
 		logging.Error(err)
-		return nil, fmt.Errorf(StatusCodeInvalidAttrNameOrValue)
+		return nil, errors.New(StatusCodeInvalidAttrNameOrValue)
 	}
 
 	cert, key, err := getResponseCert(ctx, p.storage)
 	if err != nil {
 		logging.Error(err)
-		return nil, fmt.Errorf(StatusCodeInvalidAttrNameOrValue)
+		return nil, errors.New(StatusCodeInvalidAttrNameOrValue)
 	}
 
 	samlResponse := response.makeSuccessfulResponse(attrs, p.TimeFormat, p.Expiration)
 	if err := createSignature(response, samlResponse, key, cert, p.conf.SignatureAlgorithm); err != nil {
 		logging.Error(err)
-		return nil, fmt.Errorf(StatusCodeResponder)
+		return nil, errors.New(StatusCodeResponder)
 	}
 	return samlResponse, nil
 }
