@@ -27,18 +27,18 @@ The most important packages of the library:
 
 Supported SAML features:
 
-| Feature | Identity provider |
-| --- | --- | 
-| POST-binding | yes |
-| Redirect-binding | yes |
-| Artifact-binding | [no](https://github.com/zitadel/zitadel/issues/3089) |
-| Request signing | yes |
-| Response signing | yes |
-| Metadata signing | yes |
-| Response encryption | [no](https://github.com/zitadel/zitadel/issues/3090) |
-| Assertion Query/Request | no |
-| Attribute Query | yes |
-| NameID Mapping | no |
+| Feature                 | Identity provider                                    |
+|-------------------------|------------------------------------------------------| 
+| POST-binding            | yes                                                  |
+| Redirect-binding        | yes                                                  |
+| Artifact-binding        | [no](https://github.com/zitadel/zitadel/issues/3089) |
+| Request signing         | yes                                                  |
+| Response signing        | yes                                                  |
+| Metadata signing        | yes                                                  |
+| Response encryption     | [no](https://github.com/zitadel/zitadel/issues/3090) |
+| Assertion Query/Request | no                                                   |
+| Attribute Query         | yes                                                  |
+| NameID Mapping          | no                                                   |
 
 ## Resources
 
@@ -55,15 +55,13 @@ For your convenience you can find the relevant standards linked below.
 
 ## Supported Go Versions
 
-For security reasons, we only support and recommend the use of one of the latest three Go versions (:white_check_mark:)
-.  
-Versions that also build are marked with :warning:.
+For security reasons, we only support and recommend the use of one of the latest three Go versions (:white_check_mark:).
 
 | Version | Supported          |
-| ------- | ------------------ |
-| <1.23   | :x:                |
-| 1.23    | :white_check_mark: |
+|---------|--------------------|
+| <1.24   | :x:                |
 | 1.24    | :white_check_mark: |
+| 1.25    | :white_check_mark: |
 
 ## Why another library
 
