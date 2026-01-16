@@ -12,7 +12,7 @@ require (
 	github.com/muhlemmer/httpforwarded v0.1.0
 	github.com/russellhaering/goxmldsig v1.6.0
 	github.com/stretchr/testify v1.11.1
-	github.com/zitadel/logging v0.6.2
+	github.com/zitadel/logging v0.7.0
 )
 
 require (
