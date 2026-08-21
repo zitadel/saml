@@ -11,7 +11,7 @@ require (
 	github.com/gorilla/mux v1.8.1
 	github.com/muhlemmer/httpforwarded v0.1.0
 	github.com/russellhaering/goxmldsig v1.6.0
-	github.com/stretchr/testify v1.12.0
+	github.com/stretchr/testify v1.12.1
 	github.com/zitadel/logging v0.7.0
 )
 
@@ -19,6 +19,6 @@ require (
 	github.com/felixge/httpsnoop v1.0.3 // indirect
 	github.com/jonboulle/clockwork v0.5.0 // indirect
 	github.com/sirupsen/logrus v1.9.3 // indirect
+	go.yaml.in/yaml/v3 v3.0.5 // indirect
 	golang.org/x/sys v0.27.0 // indirect
-	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
