@@ -76,6 +76,17 @@ func (p *IdentityProvider) logoutHandleFunc(w http.ResponseWriter, r *http.Reque
 		},
 	)
 
+	// ensure the issuer exists since it identifies the service provider
+	checkerInstance.WithLogicStep(
+		func() error {
+			err = checkIssuerPresent(logoutRequest.Issuer)
+			return err
+		},
+		func() {
+			response.sendBackLogoutResponse(w, response.makeFailedLogoutResponse(StatusCodeRequestDenied, fmt.Errorf("failed to validate request: %w", err).Error(), p.TimeFormat))
+		},
+	)
+
 	// get persisted service provider from issuer out of the request
 	checkerInstance.WithLogicStep(
 		func() error {
@@ -108,7 +119,13 @@ func (p *IdentityProvider) logoutHandleFunc(w http.ResponseWriter, r *http.Reque
 		w,
 		response.makeSuccessfulLogoutResponse(p.TimeFormat),
 	)
-	logging.Info(fmt.Sprintf("logout request for user %s", logoutRequest.NameID.Text))
+
+	if logoutRequest.NameID != nil {
+		logging.Info(fmt.Sprintf("logout request for user %s", logoutRequest.NameID.Text))
+		return
+	}
+
+	logging.Info(fmt.Sprintf("logout request without NameID from issuer %s", logoutRequest.Issuer.Text))
 }
 
 func getLogoutRequestFromRequest(r *http.Request) (*LogoutRequestForm, error) {
