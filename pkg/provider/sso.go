@@ -12,6 +12,7 @@ import (
 	"github.com/zitadel/saml/pkg/provider/serviceprovider"
 	"github.com/zitadel/saml/pkg/provider/xml"
 	"github.com/zitadel/saml/pkg/provider/xml/md"
+	"github.com/zitadel/saml/pkg/provider/xml/saml"
 	"github.com/zitadel/saml/pkg/provider/xml/samlp"
 	"github.com/zitadel/saml/pkg/provider/xml/xml_dsig"
 )
@@ -97,6 +98,17 @@ func (p *IdentityProvider) ssoHandleFunc(w http.ResponseWriter, r *http.Request)
 		},
 		func() {
 			response.sendBackResponse(r, w, response.makeFailedResponse(StatusCodeRequestDenied, fmt.Errorf("failed to decode request").Error(), p.TimeFormat))
+		},
+	)
+
+	// ensure the issuer exists since it identifies the service provider
+	checkerInstance.WithLogicStep(
+		func() error {
+			err = checkIssuerPresent(authNRequest.Issuer)
+			return err
+		},
+		func() {
+			response.sendBackResponse(r, w, response.makeFailedResponse(StatusCodeRequestDenied, fmt.Errorf("failed to validate request: %w", err).Error(), p.TimeFormat))
 		},
 	)
 
@@ -306,10 +318,6 @@ func checkRequestRequiredContent(
 			return fmt.Errorf("version is missing in request")
 		}
 
-		if authNRequest.Issuer.Text == "" {
-			return fmt.Errorf("issuer is missing in request")
-		}
-
 		if authNRequest.Issuer.Text != sp.GetEntityID() {
 			return fmt.Errorf("issuer in request not equal entityID of service provider")
 		}
@@ -320,6 +328,14 @@ func checkRequestRequiredContent(
 
 		return nil
 	}
+}
+
+func checkIssuerPresent(issuer *saml.NameIDType) error {
+	if issuer == nil || issuer.Text == "" {
+		return fmt.Errorf("issuer is missing in request")
+	}
+
+	return nil
 }
 
 func certificateCheckNecessary(
