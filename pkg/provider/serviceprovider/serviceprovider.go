@@ -59,6 +59,9 @@ func NewServiceProvider(id string, config *Config, loginURL func(string) string)
 }
 
 func getSigningCertsFromMetadata(metadata *md.EntityDescriptorType) ([]*x509.Certificate, error) {
+	if metadata == nil || metadata.SPSSODescriptor == nil {
+		return nil, fmt.Errorf("metadata contains no SPSSODescriptor")
+	}
 	return signature.ParseCertificates(xml.GetCertsFromKeyDescriptors(metadata.SPSSODescriptor.KeyDescriptor))
 }
 
